@@ -51,12 +51,20 @@ Copia il file di esempio:
 cp .env.example .env.local
 ```
 
-Modifica `.env.local` con i tuoi valori di Supabase:
+Modifica `.env.local` con i tuoi valori:
 ```env
-NEXT_PUBLIC_SUPABASE_URL=https://drudxiolvmwoaukswhsi.supabase.co
+NEXT_PUBLIC_SUPABASE_URL=https://tuo-ref.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=la_tua_anon_key_di_supabase
 SUPABASE_SERVICE_ROLE_KEY=la_tua_service_role_key_segreta
-MCP_AUTH_TOKEN=orbita-mcp-secret-2026
+
+# Genera un token sicuro (almeno 32 caratteri casuali):
+#   openssl rand -base64 32       ← su macOS/Linux/WSL
+#   [System.Convert]::ToBase64String((1..32 | %{ [byte](Get-Random -Max 256) }))  ← PowerShell
+MCP_AUTH_TOKEN=un-token-lungo-e-casuale-di-almeno-32-caratteri
+
+# UUID del tuo utente Supabase: Dashboard > Authentication > Users > copia l'ID
+ORBITA_USER_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+
 GROQ_API_KEY=la_tua_chiave_groq_opzionale
 ```
 

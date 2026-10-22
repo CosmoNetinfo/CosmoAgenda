@@ -350,9 +350,18 @@ function verifyToken(token: string): boolean {
   return token === expectedToken;
 }
 
+// UUID del proprietario dell'agenda (richiesto per gli insert con admin client,
+// perché auth.uid() vale null quando si usa la service role key)
+function getOwnerUserId(): string {
+  const uid = process.env.ORBITA_USER_ID;
+  if (!uid) throw new Error("ORBITA_USER_ID non configurata: impossibile operare sui dati");
+  return uid;
+}
+
 // Handler per l'esecuzione degli strumenti
 async function executeTool(name: string, args: any) {
   const supabase = createAdminClient();
+  const ownerUserId = getOwnerUserId();
 
   switch (name) {
     case "add_task": {
@@ -360,6 +369,7 @@ async function executeTool(name: string, args: any) {
       const { data, error } = await supabase
         .from("tasks")
         .insert({
+          user_id: ownerUserId,
           title,
           date,
           time: time || null,
@@ -383,7 +393,7 @@ async function executeTool(name: string, args: any) {
 
     case "list_tasks": {
       const { start_date, end_date, status, project, kind } = args;
-      let query = supabase.from("tasks").select("*");
+      let query = supabase.from("tasks").select("*").eq("user_id", ownerUserId);
 
       if (start_date) query = query.gte("date", start_date);
       if (end_date) query = query.lte("date", end_date);
@@ -403,6 +413,7 @@ async function executeTool(name: string, args: any) {
       const { data, error } = await supabase
         .from("tasks")
         .select("*")
+        .eq("user_id", ownerUserId)
         .eq("date", date)
         .order("time", { ascending: true, nullsFirst: false });
 
@@ -421,6 +432,7 @@ async function executeTool(name: string, args: any) {
         .from("tasks")
         .update(updates)
         .eq("id", task_id)
+        .eq("user_id", ownerUserId)
         .select()
         .single();
 
@@ -434,6 +446,7 @@ async function executeTool(name: string, args: any) {
         .from("tasks")
         .update({ status: "done", done_at: new Date().toISOString() })
         .eq("id", task_id)
+        .eq("user_id", ownerUserId)
         .select()
         .single();
 
@@ -447,6 +460,7 @@ async function executeTool(name: string, args: any) {
         .from("tasks")
         .update({ status: "skipped" })
         .eq("id", task_id)
+        .eq("user_id", ownerUserId)
         .select()
         .single();
 
@@ -460,6 +474,7 @@ async function executeTool(name: string, args: any) {
         .from("tasks")
         .select("notes")
         .eq("id", task_id)
+        .eq("user_id", ownerUserId)
         .single();
 
       if (fetchErr) throw fetchErr;
@@ -471,6 +486,7 @@ async function executeTool(name: string, args: any) {
         .from("tasks")
         .update({ notes: updatedNotes })
         .eq("id", task_id)
+        .eq("user_id", ownerUserId)
         .select()
         .single();
 
@@ -592,11 +608,12 @@ async function executeTool(name: string, args: any) {
         let validUrl = u.trim();
         if (!/^https?:\/\//i.test(validUrl)) validUrl = `https://${validUrl}`;
 
-        // Verifica duplicati
+        // Verifica duplicati filtrati anche per user_id
         const { data: existing } = await supabase
           .from("ideas")
           .select("id, url")
           .eq("url", validUrl)
+          .eq("user_id", ownerUserId)
           .maybeSingle();
 
         if (existing) {
@@ -616,6 +633,7 @@ async function executeTool(name: string, args: any) {
         const { data, error } = await supabase
           .from("ideas")
           .insert({
+            user_id: ownerUserId,
             url: validUrl,
             title,
             note,
@@ -641,7 +659,7 @@ async function executeTool(name: string, args: any) {
 
     case "list_ideas": {
       const { status, project } = args;
-      let query = supabase.from("ideas").select("*");
+      let query = supabase.from("ideas").select("*").eq("user_id", ownerUserId);
 
       if (status && status !== "tutte") query = query.eq("status", status);
       if (project && project !== "tutti") query = query.eq("project", project);
@@ -666,6 +684,7 @@ async function executeTool(name: string, args: any) {
         .from("ideas")
         .update(updates)
         .eq("id", idea_id)
+        .eq("user_id", ownerUserId)
         .select()
         .single();
 
