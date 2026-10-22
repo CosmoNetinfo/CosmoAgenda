@@ -1,1 +1,1 @@
-export { GET, POST } from "@/app/api/mcp/[token]/route";
+export { GET, POST, OPTIONS } from "@/app/api/mcp/[token]/route";

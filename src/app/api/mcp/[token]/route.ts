@@ -678,14 +678,27 @@ async function executeTool(name: string, args: any) {
   }
 }
 
+// Intestazioni CORS per tutti i metodi — richieste da tutte le origini
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Accept",
+};
+
+// Preflight CORS
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { token: string } }
 ) {
+  // Token sbagliato → 404 (non 401) così Claude non tenta OAuth
   if (!verifyToken(params.token)) {
     return NextResponse.json(
-      { error: "Token MCP non valido o non autorizzato" },
-      { status: 401 }
+      { error: "Non trovato" },
+      { status: 404, headers: CORS_HEADERS }
     );
   }
 
@@ -698,36 +711,34 @@ export async function POST(
 
       // Inizializzazione protocollo MCP
       if (method === "initialize") {
-        return NextResponse.json({
-          jsonrpc: "2.0",
-          id,
-          result: {
-            protocolVersion: "2024-11-05",
-            capabilities: {
-              tools: {},
-            },
-            serverInfo: {
-              name: "orbita-agent",
-              version: "1.0.0",
+        return NextResponse.json(
+          {
+            jsonrpc: "2.0",
+            id,
+            result: {
+              protocolVersion: "2024-11-05",
+              capabilities: { tools: {} },
+              serverInfo: { name: "orbita-agent", version: "1.0.0" },
             },
           },
-        });
+          { headers: CORS_HEADERS }
+        );
       }
 
       // Ping
       if (method === "ping") {
-        return NextResponse.json({ jsonrpc: "2.0", id, result: {} });
+        return NextResponse.json(
+          { jsonrpc: "2.0", id, result: {} },
+          { headers: CORS_HEADERS }
+        );
       }
 
       // Elenco degli strumenti
       if (method === "tools/list") {
-        return NextResponse.json({
-          jsonrpc: "2.0",
-          id,
-          result: {
-            tools: MCP_TOOLS,
-          },
-        });
+        return NextResponse.json(
+          { jsonrpc: "2.0", id, result: { tools: MCP_TOOLS } },
+          { headers: CORS_HEADERS }
+        );
       }
 
       // Esecuzione strumento
@@ -735,57 +746,57 @@ export async function POST(
         const { name, arguments: toolArgs } = rpcParams;
         try {
           const result = await executeTool(name, toolArgs || {});
-          return NextResponse.json({
-            jsonrpc: "2.0",
-            id,
-            result: {
-              content: [
-                {
-                  type: "text",
-                  text: JSON.stringify(result, null, 2),
-                },
-              ],
+          return NextResponse.json(
+            {
+              jsonrpc: "2.0",
+              id,
+              result: {
+                content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+              },
             },
-          });
+            { headers: CORS_HEADERS }
+          );
         } catch (execError: any) {
-          return NextResponse.json({
-            jsonrpc: "2.0",
-            id,
-            result: {
-              isError: true,
-              content: [
-                {
-                  type: "text",
-                  text: `Errore nell'esecuzione dello strumento ${name}: ${execError.message}`,
-                },
-              ],
+          return NextResponse.json(
+            {
+              jsonrpc: "2.0",
+              id,
+              result: {
+                isError: true,
+                content: [
+                  {
+                    type: "text",
+                    text: `Errore nell'esecuzione dello strumento ${name}: ${execError.message}`,
+                  },
+                ],
+              },
             },
-          });
+            { headers: CORS_HEADERS }
+          );
         }
       }
 
-      return NextResponse.json({
-        jsonrpc: "2.0",
-        id,
-        error: { code: -32601, message: `Metodo non trovato: ${method}` },
-      });
+      return NextResponse.json(
+        { jsonrpc: "2.0", id, error: { code: -32601, message: `Metodo non trovato: ${method}` } },
+        { headers: CORS_HEADERS }
+      );
     }
 
     // Gestione semplificata per chiamate REST dirette: { action: "add_task", ... }
     if (body.action) {
       const result = await executeTool(body.action, body.parameters || body);
-      return NextResponse.json({ success: true, result });
+      return NextResponse.json({ success: true, result }, { headers: CORS_HEADERS });
     }
 
     return NextResponse.json(
       { error: "Formato payload non supportato. Richiesto JSON-RPC 2.0 o action." },
-      { status: 400 }
+      { status: 400, headers: CORS_HEADERS }
     );
   } catch (error: any) {
     console.error("Errore server MCP:", error);
     return NextResponse.json(
       { error: error.message || "Errore interno server MCP" },
-      { status: 500 }
+      { status: 500, headers: CORS_HEADERS }
     );
   }
 }
@@ -795,17 +806,21 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { token: string } }
 ) {
+  // Token sbagliato → 404 (non 401) così Claude non tenta OAuth
   if (!verifyToken(params.token)) {
     return NextResponse.json(
-      { error: "Token MCP non valido" },
-      { status: 401 }
+      { error: "Non trovato" },
+      { status: 404, headers: CORS_HEADERS }
     );
   }
 
-  return NextResponse.json({
-    status: "online",
-    server: "orbita-agent",
-    protocolVersion: "2024-11-05",
-    tools: MCP_TOOLS,
-  });
+  return NextResponse.json(
+    {
+      status: "online",
+      server: "orbita-agent",
+      protocolVersion: "2024-11-05",
+      tools: MCP_TOOLS,
+    },
+    { headers: CORS_HEADERS }
+  );
 }
