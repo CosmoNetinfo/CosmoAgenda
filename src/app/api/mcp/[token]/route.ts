@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sendPushToUser } from "@/lib/push";
 
 // Server MCP remoto per Claude, Grok e assistenti IA
 // Trasporto HTTP Streamable / JSON-RPC 2.0 conforme alle specifiche MCP 2024-11-05
@@ -384,6 +385,19 @@ async function executeTool(name: string, args: any) {
         .single();
 
       if (error) throw error;
+
+      // Invia notifica push nativa immediata (stile messaggio WhatsApp)
+      try {
+        const timeStr = data.time ? ` alle ${data.time.substring(0, 5)}` : "";
+        sendPushToUser(ownerUserId, {
+          title: "👾 C'è da fare una cosa!",
+          body: `"${data.title}" per il ${data.date}${timeStr}`,
+          url: "/",
+        }).catch((e) => console.error("Errore notifica push MCP:", e));
+      } catch (pushErr) {
+        // Non bloccare la risposta MCP se l'invio push fallisce
+      }
+
       return {
         success: true,
         message: `Attività aggiunta: "${data.title}" per il giorno ${data.date}`,
@@ -519,6 +533,19 @@ async function executeTool(name: string, args: any) {
         .single();
 
       if (error) throw error;
+
+      // Invia notifica push nativa immediata (stile messaggio WhatsApp)
+      try {
+        const timeStr = data.time ? ` alle ${data.time.substring(0, 5)}` : "";
+        sendPushToUser(ownerUserId, {
+          title: "👾 C'è da fare una cosa!",
+          body: `"${data.title}" per il ${data.date}${timeStr}`,
+          url: "/",
+        }).catch((e) => console.error("Errore notifica push MCP:", e));
+      } catch (pushErr) {
+        // Non bloccare la risposta MCP se l'invio push fallisce
+      }
+
       return {
         success: true,
         message: `File Markdown "${data.name}" allegato con successo all'attività`,
@@ -578,6 +605,19 @@ async function executeTool(name: string, args: any) {
         .single();
 
       if (error) throw error;
+
+      // Invia notifica push nativa immediata (stile messaggio WhatsApp)
+      try {
+        const timeStr = data.time ? ` alle ${data.time.substring(0, 5)}` : "";
+        sendPushToUser(ownerUserId, {
+          title: "👾 C'è da fare una cosa!",
+          body: `"${data.title}" per il ${data.date}${timeStr}`,
+          url: "/",
+        }).catch((e) => console.error("Errore notifica push MCP:", e));
+      } catch (pushErr) {
+        // Non bloccare la risposta MCP se l'invio push fallisce
+      }
+
       return {
         success: true,
         message: `File "${data.name}" aggiornato con successo`,

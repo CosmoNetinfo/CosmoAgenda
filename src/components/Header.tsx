@@ -3,7 +3,7 @@
 import React from "react";
 import { APP_CONFIG } from "@/config/app";
 import { MascotCosmino } from "./MascotCosmino";
-import { Mic, Search, Info, LogOut, X, Sparkles } from "lucide-react";
+import { Mic, Search, Info, LogOut, X, Sparkles, Bell } from "lucide-react";
 
 interface HeaderProps {
   onOpenVoice: () => void;
@@ -81,6 +81,16 @@ export function Header({
               title="Cerca tra le attività"
             >
               <Search size={18} className="stroke-[2]" />
+            </button>
+
+            {/* Tasto Notifiche e Info */}
+            <button
+              onClick={onOpenInfo}
+              type="button"
+              className="p-2.5 rounded-2xl bg-white text-plum-600 border border-cream-200 hover:bg-cream-50 transition-all shadow-2xs hover:text-cosmo-alien"
+              title="Notifiche e Connettori"
+            >
+              <Bell size={18} className="stroke-[2]" />
             </button>
 
             {/* Tasto Info */}

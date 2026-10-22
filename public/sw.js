@@ -61,3 +61,63 @@ self.addEventListener("fetch", (event) => {
     })
   );
 });
+
+// ============================================================
+// GESTIONE NOTIFICHE PUSH NATIVE (Stile banner WhatsApp / Promemoria)
+// ============================================================
+
+self.addEventListener("push", (event) => {
+  let data = {
+    title: "👾 Orbita Agent",
+    body: "C'è da fare una cosa!",
+    url: "/",
+    icon: "/icon.svg",
+    badge: "/icon.svg",
+  };
+
+  if (event.data) {
+    try {
+      const parsed = event.data.json();
+      data = { ...data, ...parsed };
+    } catch (err) {
+      data.body = event.data.text() || data.body;
+    }
+  }
+
+  const options = {
+    body: data.body,
+    icon: data.icon || "/icon.svg",
+    badge: data.badge || "/icon.svg",
+    vibrate: [200, 100, 200, 100, 200],
+    data: {
+      url: data.url || "/",
+    },
+    actions: [
+      { action: "open", title: "Apri Agenda 🚀" }
+    ],
+    tag: data.tag || `orbita-task-${Date.now()}`,
+    renotify: true,
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, options)
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const targetUrl = event.notification.data?.url || "/";
+
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
+      for (let client of windowClients) {
+        if (client.url.includes(self.location.origin) && "focus" in client) {
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl);
+      }
+    })
+  );
+});

@@ -1,0 +1,28 @@
+name: Keep Supabase Awake
+
+on:
+  schedule:
+    # Esegue ogni giorno alle 07:00 UTC (8:00 o 9:00 ora italiana)
+    - cron: "0 7 * * *"
+  workflow_dispatch: # Permette anche di avviarlo manualmente da GitHub con un clic
+
+jobs:
+  ping-database:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Orbita Agent Health & Supabase Keep-Alive
+        run: |
+          echo "📡 Invio ping all'endpoint di salute di Orbita Agent..."
+          HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" "https://cosmo-agenda.vercel.app/api/health")
+          HTTP_BODY=$(echo "$HTTP_RESPONSE" | sed '$d')
+          HTTP_STATUS=$(echo "$HTTP_RESPONSE" | tail -n 1)
+
+          echo "Status HTTP: $HTTP_STATUS"
+          echo "Risposta: $HTTP_BODY"
+
+          if [ "$HTTP_STATUS" -eq 200 ]; then
+            echo "✅ Database Supabase attivo e reattivo!"
+          else
+            echo "⚠️ Risposta anomala dall'endpoint (status $HTTP_STATUS)"
+            exit 1
+          fi

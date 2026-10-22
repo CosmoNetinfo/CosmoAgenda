@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { APP_CONFIG } from "@/config/app";
 import { MascotCosmino } from "./MascotCosmino";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 import {
   X,
   Copy,
@@ -13,6 +14,10 @@ import {
   Sparkles,
   ShieldCheck,
   Cpu,
+  Bell,
+  BellRing,
+  Send,
+  Loader2,
 } from "lucide-react";
 
 interface InfoModalProps {
@@ -24,6 +29,15 @@ interface InfoModalProps {
 export function InfoModal({ isOpen, onClose, userEmail }: InfoModalProps) {
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [copiedToken, setCopiedToken] = useState(false);
+  const [testSent, setTestSent] = useState(false);
+  const {
+    isSupported,
+    permission,
+    isSubscribed,
+    loading: pushLoading,
+    subscribe,
+    sendTestNotification,
+  } = usePushNotifications();
 
   if (!isOpen) return null;
 
@@ -81,6 +95,79 @@ export function InfoModal({ isOpen, onClose, userEmail }: InfoModalProps) {
               <ShieldCheck size={14} /> Connesso come: <b>{userEmail}</b>
             </div>
           )}
+        </div>
+
+        {/* Notifiche Push Native (Stile WhatsApp) */}
+        <div className="mt-2 bg-white rounded-3xl p-4 border border-cream-300 shadow-card space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className={`p-2 rounded-2xl ${isSubscribed ? "bg-pastel-mint text-[#1D4E3A]" : "bg-pastel-peach text-[#5C3A20]"}`}>
+                {isSubscribed ? <BellRing size={18} /> : <Bell size={18} />}
+              </span>
+              <div>
+                <h4 className="text-sm font-bold text-plum-900 leading-none">
+                  Notifiche Push (Banner)
+                </h4>
+                <p className="text-[11px] text-plum-500 mt-0.5">
+                  Avvisi stile messaggio con vibrazione e suono
+                </p>
+              </div>
+            </div>
+            {isSubscribed && (
+              <span className="text-[11px] font-bold text-[#1D4E3A] bg-pastel-mint px-2 py-0.5 rounded-full border border-[#A4D8BF]">
+                Attive ✅
+              </span>
+            )}
+          </div>
+
+          <p className="text-[11px] text-plum-600 leading-relaxed">
+            Ricevi un banner a comparsa in cima allo schermo quando Claude inserisce una nuova attività o quando c&apos;è una cosa da fare.
+          </p>
+
+          <div className="flex flex-col sm:flex-row gap-2 pt-1">
+            {!isSubscribed ? (
+              <button
+                type="button"
+                onClick={async () => {
+                  await subscribe();
+                }}
+                disabled={pushLoading}
+                className="w-full py-2.5 px-4 bg-gradient-to-r from-cosmo-alien to-[#4A72E8] text-white font-bold text-xs rounded-xl shadow-soft hover:opacity-95 transition-all flex items-center justify-center gap-2"
+              >
+                {pushLoading ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Bell size={16} />
+                )}
+                Attiva Notifiche su questo dispositivo
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={async () => {
+                  const res = await sendTestNotification();
+                  if (res?.success) {
+                    setTestSent(true);
+                    setTimeout(() => setTestSent(false), 3000);
+                  }
+                }}
+                disabled={pushLoading}
+                className="w-full py-2.5 px-4 bg-pastel-butter text-[#554316] hover:bg-[#FBE8A6] border border-[#ECD182] font-bold text-xs rounded-xl shadow-2xs transition-all flex items-center justify-center gap-2"
+              >
+                {pushLoading ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : testSent ? (
+                  <>
+                    <Check size={16} className="text-green-700" /> Notifica inviata! Controlla lo schermo
+                  </>
+                ) : (
+                  <>
+                    <Send size={15} /> Prova notifica &quot;C&apos;è da fare una cosa&quot;
+                  </>
+                )}
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Connettore MCP per Claude & Grok */}
