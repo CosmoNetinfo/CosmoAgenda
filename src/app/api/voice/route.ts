@@ -83,30 +83,48 @@ Schema JSON richiesto:
   "notes": "stringa con eventuali dettagli secondari o null"
 }`;
 
-      const llamaRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${groqApiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
-          temperature: 0.1,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: transcriptionText },
-          ],
-          response_format: { type: "json_object" },
-        }),
-      });
+      const candidateModels = [
+        "openai/gpt-oss-120b",
+        "openai/gpt-oss-20b",
+        "llama-3.3-70b-versatile",
+        "llama-3.1-8b-instant",
+        "llama3-70b-8192",
+      ];
 
-      if (llamaRes.ok) {
-        const llamaData = await llamaRes.json();
-        const contentStr = llamaData.choices?.[0]?.message?.content || "{}";
+      for (const modelName of candidateModels) {
         try {
-          extracted = JSON.parse(contentStr);
+          const llamaRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${groqApiKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              model: modelName,
+              temperature: 0.1,
+              messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: transcriptionText },
+              ],
+            }),
+          });
+
+          if (llamaRes.ok) {
+            const llamaData = await llamaRes.json();
+            const contentStr = llamaData.choices?.[0]?.message?.content || "{}";
+            // Estrae eventuale blocco JSON markdown
+            const cleanJson = contentStr
+              .replace(/^```json\s*/i, "")
+              .replace(/^```\s*/i, "")
+              .replace(/```\s*$/i, "")
+              .trim();
+            extracted = JSON.parse(cleanJson);
+            if (extracted && extracted.title) {
+              break;
+            }
+          }
         } catch {
-          extracted = null;
+          // Prova il modello successivo
         }
       }
     }
