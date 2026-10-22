@@ -3,11 +3,12 @@
 import React from "react";
 import { APP_CONFIG } from "@/config/app";
 import { MascotCosmino } from "./MascotCosmino";
-import { Mic, Search, Info, LogOut, X, Sparkles, Bell } from "lucide-react";
+import { Mic, Search, Info, LogOut, X, Sparkles, Bell, Settings } from "lucide-react";
 
 interface HeaderProps {
   onOpenVoice: () => void;
   onOpenInfo: () => void;
+  onOpenSettings: () => void;
   onLogout: () => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
@@ -19,6 +20,7 @@ interface HeaderProps {
 export function Header({
   onOpenVoice,
   onOpenInfo,
+  onOpenSettings,
   onLogout,
   searchQuery,
   onSearchChange,
@@ -54,15 +56,15 @@ export function Header({
           </div>
 
           {/* Azioni rapide */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
             {/* Tasto Vocale (Fase 5) */}
             <button
               onClick={onOpenVoice}
               type="button"
-              className="relative p-2.5 rounded-2xl bg-gradient-to-tr from-pastel-pink to-pastel-peach text-plum-800 hover:scale-105 active:scale-95 transition-all shadow-soft border border-pastel-pink/60 flex items-center justify-center group"
+              className="relative p-2 rounded-2xl bg-gradient-to-tr from-pastel-pink to-pastel-peach text-plum-800 hover:scale-105 active:scale-95 transition-all shadow-soft border border-pastel-pink/60 flex items-center justify-center group"
               title="Dettatura vocale con IA"
             >
-              <Mic size={18} className="stroke-[2.2] text-[#5A2838] group-hover:animate-bounce-gentle" />
+              <Mic size={17} className="stroke-[2.2] text-[#5A2838] group-hover:animate-bounce-gentle" />
               <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#FF8DA1] opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#E64980]"></span>
@@ -73,44 +75,44 @@ export function Header({
             <button
               onClick={() => setShowSearch(!showSearch)}
               type="button"
-              className={`p-2.5 rounded-2xl transition-all shadow-2xs border ${
+              className={`p-2 rounded-2xl transition-all shadow-2xs border ${
                 showSearch
                   ? "bg-pastel-sky text-cosmo-alien border-pastel-sky"
                   : "bg-white text-plum-600 border-cream-200 hover:bg-cream-50"
               }`}
               title="Cerca tra le attività"
             >
-              <Search size={18} className="stroke-[2]" />
+              <Search size={17} className="stroke-[2]" />
             </button>
 
-            {/* Tasto Notifiche e Info */}
+            {/* Tasto Impostazioni & Diagnostica */}
             <button
-              onClick={onOpenInfo}
+              onClick={onOpenSettings}
               type="button"
-              className="p-2.5 rounded-2xl bg-white text-plum-600 border border-cream-200 hover:bg-cream-50 transition-all shadow-2xs hover:text-cosmo-alien"
-              title="Notifiche e Connettori"
+              className="p-2 rounded-2xl bg-white text-plum-600 border border-cream-200 hover:bg-cream-50 transition-all shadow-2xs hover:text-cosmo-alien"
+              title="Impostazioni, Notifiche e Microfono"
             >
-              <Bell size={18} className="stroke-[2]" />
+              <Settings size={17} className="stroke-[2]" />
             </button>
 
             {/* Tasto Info */}
             <button
               onClick={onOpenInfo}
               type="button"
-              className="p-2.5 rounded-2xl bg-white text-plum-600 border border-cream-200 hover:bg-cream-50 transition-all shadow-2xs"
+              className="p-2 rounded-2xl bg-white text-plum-600 border border-cream-200 hover:bg-cream-50 transition-all shadow-2xs"
               title="Info e connettore MCP"
             >
-              <Info size={18} className="stroke-[2]" />
+              <Info size={17} className="stroke-[2]" />
             </button>
 
             {/* Tasto Esci */}
             <button
               onClick={onLogout}
               type="button"
-              className="p-2.5 rounded-2xl bg-white text-plum-500 border border-cream-200 hover:bg-[#FFE5E5] hover:text-[#D32F2F] hover:border-[#FFCDD2] transition-all shadow-2xs"
+              className="p-2 rounded-2xl bg-white text-plum-500 border border-cream-200 hover:bg-[#FFE5E5] hover:text-[#D32F2F] hover:border-[#FFCDD2] transition-all shadow-2xs"
               title="Esci dall'account"
             >
-              <LogOut size={18} className="stroke-[2]" />
+              <LogOut size={17} className="stroke-[2]" />
             </button>
           </div>
         </div>

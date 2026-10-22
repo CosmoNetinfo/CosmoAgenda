@@ -15,6 +15,7 @@ import { IdeasView } from "@/components/IdeasView";
 import { TaskModal } from "@/components/TaskModal";
 import { VoiceModal } from "@/components/VoiceModal";
 import { InfoModal } from "@/components/InfoModal";
+import { SettingsModal } from "@/components/SettingsModal";
 import { MascotCosmino } from "@/components/MascotCosmino";
 import { Loader2, AlertCircle, WifiOff } from "lucide-react";
 
@@ -42,6 +43,7 @@ export default function HomePage() {
   const [modalDefaultDate, setModalDefaultDate] = useState<string>(selectedDate);
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
   // Monitoraggio connessione
   useEffect(() => {
@@ -423,6 +425,7 @@ export default function HomePage() {
       <Header
         onOpenVoice={() => setIsVoiceModalOpen(true)}
         onOpenInfo={() => setIsInfoModalOpen(true)}
+        onOpenSettings={() => setIsSettingsModalOpen(true)}
         onLogout={handleLogout}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
@@ -509,6 +512,14 @@ export default function HomePage() {
         isOpen={isInfoModalOpen}
         onClose={() => setIsInfoModalOpen(false)}
         userEmail={userEmail}
+      />
+
+      {/* Modale Impostazioni & Diagnostica (Notifiche & Microfono) */}
+      <SettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
+        userEmail={userEmail}
+        onRefreshData={refreshTasks}
       />
     </div>
   );
