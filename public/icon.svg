@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFDFB" />
+      <stop offset="1" stop-color="#FFF8F3" />
+    </linearGradient>
+    <linearGradient id="alienGrad" x1="120" y1="120" x2="400" y2="420" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6B8CFF" />
+      <stop offset="0.5" stop-color="#4F75FF" />
+      <stop offset="1" stop-color="#2F55E6" />
+    </linearGradient>
+    <linearGradient id="bellyGrad" x1="256" y1="310" x2="256" y2="410" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E0EBFF" />
+      <stop offset="1" stop-color="#BED6FF" />
+    </linearGradient>
+    <radialGradient id="antennaOrb" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FFF7A6" />
+      <stop offset="60%" stop-color="#FFDE43" />
+      <stop offset="100%" stop-color="#F59E0B" />
+    </radialGradient>
+    <filter id="softShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="16" stdDeviation="20" flood-color="#4A4458" flood-opacity="0.12" />
+    </filter>
+  </defs>
+
+  <!-- Sfondo icona con angoli arrotondati stile iOS / Android -->
+  <rect width="512" height="512" rx="128" fill="url(#bgGrad)" />
+  <rect width="512" height="512" rx="128" stroke="#F0E7DE" stroke-width="4" />
+
+  <!-- Mascotte Cosmino centrata con ombra -->
+  <g filter="url(#softShadow)">
+    <!-- Antennina -->
+    <path d="M256 165 Q248 105 256 70" stroke="#4F75FF" stroke-width="16" stroke-linecap="round" />
+    <circle cx="256" cy="58" r="30" fill="url(#antennaOrb)" />
+    <circle cx="248" cy="50" r="8" fill="#FFFFFF" />
+
+    <!-- Orecchiette da alieno carino -->
+    <path d="M125 210 Q75 200 90 260 Q112 268 125 245" fill="#4F75FF" />
+    <path d="M387 210 Q437 200 422 260 Q400 268 387 245" fill="#4F75FF" />
+
+    <!-- Testa e corpo soffice arrotondato -->
+    <rect x="116" y="145" width="280" height="270" rx="130" fill="url(#alienGrad)" />
+
+    <!-- Pancina chiara -->
+    <ellipse cx="256" cy="355" rx="85" ry="50" fill="url(#bellyGrad)" />
+
+    <!-- Guanciotte rosa -->
+    <ellipse cx="175" cy="285" rx="26" ry="15" fill="#FFB3C6" fill-opacity="0.8" />
+    <ellipse cx="337" cy="285" rx="26" ry="15" fill="#FFB3C6" fill-opacity="0.8" />
+
+    <!-- Occhioni pucciosi -->
+    <ellipse cx="200" cy="240" rx="26" ry="30" fill="#2D2838" />
+    <circle cx="193" cy="228" r="11" fill="#FFFFFF" />
+    <circle cx="208" cy="245" r="5" fill="#FFFFFF" />
+
+    <ellipse cx="312" cy="240" rx="26" ry="30" fill="#2D2838" />
+    <circle cx="305" cy="228" r="11" fill="#FFFFFF" />
+    <circle cx="320" cy="245" r="5" fill="#FFFFFF" />
+
+    <!-- Dolce sorriso -->
+    <path d="M236 280 Q256 302 276 280" stroke="#2D2838" stroke-width="10" stroke-linecap="round" />
+  </g>
+</svg>
