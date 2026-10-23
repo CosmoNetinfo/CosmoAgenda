@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { Task } from "@/types";
 import { TaskCard } from "./TaskCard";
 import { ChevronLeft, ChevronRight, Plus, CheckCircle2, Calendar } from "lucide-react";
+import { parseLocalDate, getMonday, getLocalDateString, getTodayString, addDays } from "@/lib/date-utils";
 
 interface WeekViewProps {
   currentDate: string; // YYYY-MM-DD
@@ -22,23 +23,15 @@ export function WeekView({
   onClickTask,
   onOpenNewTaskForDate,
 }: WeekViewProps) {
-  // Calcola l'inizio della settimana (Lunedì)
-  const getMonday = (d: Date) => {
-    const date = new Date(d);
-    const day = date.getDay();
-    const diff = date.getDate() - day + (day === 0 ? -6 : 1);
-    return new Date(date.setDate(diff));
-  };
-
-  const selectedD = new Date(currentDate + "T00:00:00");
+  const selectedD = parseLocalDate(currentDate);
   const monday = getMonday(selectedD);
+  const todayStr = getTodayString();
 
   // Costruisce i 7 giorni (Lunedì -> Domenica)
   const weekDays = Array.from({ length: 7 }, (_, i) => {
-    const dayDate = new Date(monday);
-    dayDate.setDate(monday.getDate() + i);
-    const dateStr = dayDate.toISOString().slice(0, 10);
-    const isToday = dateStr === new Date().toISOString().slice(0, 10);
+    const dayDate = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i);
+    const dateStr = getLocalDateString(dayDate);
+    const isToday = dateStr === todayStr;
     const isSelected = dateStr === currentDate;
 
     const weekdayShort = dayDate.toLocaleDateString("it-IT", { weekday: "short" });
@@ -60,9 +53,7 @@ export function WeekView({
   });
 
   const changeWeek = (deltaWeeks: number) => {
-    const newDate = new Date(currentDate + "T00:00:00");
-    newDate.setDate(newDate.getDate() + deltaWeeks * 7);
-    onSelectDate(newDate.toISOString().slice(0, 10));
+    onSelectDate(addDays(currentDate, deltaWeeks * 7));
   };
 
   // Calcolo totale settimana

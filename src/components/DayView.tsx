@@ -6,6 +6,7 @@ import { TaskCard } from "./TaskCard";
 import { MascotCosmino } from "./MascotCosmino";
 import { ChevronLeft, ChevronRight, Plus, Sparkles, AlertCircle } from "lucide-react";
 import confetti from "canvas-confetti";
+import { addDays, getTodayString, formatItalianDate } from "@/lib/date-utils";
 
 interface DayViewProps {
   currentDate: string; // YYYY-MM-DD
@@ -63,33 +64,14 @@ export function DayView({
 
   // Navigazione date
   const changeDay = (delta: number) => {
-    const d = new Date(currentDate);
-    d.setDate(d.getDate() + delta);
-    onDateChange(d.toISOString().slice(0, 10));
+    onDateChange(addDays(currentDate, delta));
   };
 
   const setToday = () => {
-    onDateChange(new Date().toISOString().slice(0, 10));
+    onDateChange(getTodayString());
   };
 
-  // Formattazione data italiana
-  const formattedDate = () => {
-    const d = new Date(currentDate + "T00:00:00");
-    const today = new Date().toISOString().slice(0, 10);
-    const isToday = currentDate === today;
-
-    const weekday = d.toLocaleDateString("it-IT", { weekday: "long" });
-    const dayMonth = d.toLocaleDateString("it-IT", { day: "numeric", month: "long" });
-    const capitalizedWeekday = weekday.charAt(0).toUpperCase() + weekday.slice(1);
-
-    return {
-      title: isToday ? `Oggi, ${capitalizedWeekday}` : capitalizedWeekday,
-      subtitle: dayMonth,
-      isToday,
-    };
-  };
-
-  const { title, subtitle, isToday } = formattedDate();
+  const { title, subtitle, isToday } = formatItalianDate(currentDate);
 
   return (
     <div className="pb-24">

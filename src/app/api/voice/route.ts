@@ -6,11 +6,13 @@ export async function POST(request: NextRequest) {
     const contentType = request.headers.get("content-type") || "";
 
     let transcriptionText = "";
+    let clientToday = "";
 
     // 1. Trascrizione Audio o ricezione testo diretto
     if (contentType.includes("multipart/form-data")) {
       const formData = await request.formData();
       const audioFile = formData.get("audio") as Blob | null;
+      clientToday = (formData.get("today") as string) || "";
 
       if (!audioFile) {
         return NextResponse.json({ error: "Nessun file audio inviato" }, { status: 400 });
@@ -55,6 +57,7 @@ export async function POST(request: NextRequest) {
     } else {
       const jsonBody = await request.json();
       transcriptionText = jsonBody.text || "";
+      clientToday = jsonBody.today || "";
     }
 
     if (!transcriptionText.trim()) {
@@ -62,8 +65,13 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. Estrazione strutturata JSON con modello Llama di Groq
-    const today = new Date().toISOString().slice(0, 10);
-    const dayOfWeek = new Date().toLocaleDateString("it-IT", { weekday: "long" });
+    // Usa fuso orario Europe/Rome per evitare che la data torni al giorno prima passata la mezzanotte
+    const now = new Date();
+    const today = clientToday || new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome" }).format(now);
+    const dayOfWeek = new Intl.DateTimeFormat("it-IT", {
+      timeZone: "Europe/Rome",
+      weekday: "long",
+    }).format(now);
 
     let extracted: any = null;
 

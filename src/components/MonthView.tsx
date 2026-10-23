@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { Task } from "@/types";
 import { APP_CONFIG } from "@/config/app";
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from "lucide-react";
+import { parseLocalDate, getTodayString } from "@/lib/date-utils";
 
 interface MonthViewProps {
   currentDate: string; // YYYY-MM-DD
@@ -16,7 +17,7 @@ export function MonthView({
   onSelectDateAndSwitchToDay,
   tasks,
 }: MonthViewProps) {
-  const currentD = new Date(currentDate + "T00:00:00");
+  const currentD = parseLocalDate(currentDate);
   const [viewYear, setViewYear] = useState(currentD.getFullYear());
   const [viewMonth, setViewMonth] = useState(currentD.getMonth()); // 0-indexed
 
@@ -43,7 +44,7 @@ export function MonthView({
   if (startDayOfWeek === -1) startDayOfWeek = 6;
 
   const totalDays = lastDayOfMonth.getDate();
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = getTodayString();
 
   // Giorni del mese precedente per riempire l'inizio
   const prevMonthLastDay = new Date(viewYear, viewMonth, 0).getDate();

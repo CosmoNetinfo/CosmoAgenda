@@ -4,6 +4,7 @@ import React, { useState, useRef } from "react";
 import { CreateTaskInput } from "@/types";
 import { APP_CONFIG, TaskKindId, TaskPriorityId } from "@/config/app";
 import { MascotCosmino } from "./MascotCosmino";
+import { getTodayString } from "@/lib/date-utils";
 import {
   Mic,
   Square,
@@ -80,6 +81,7 @@ export function VoiceModal({ isOpen, onClose, onConfirmTask }: VoiceModalProps) 
     try {
       const formData = new FormData();
       formData.append("audio", blob, "recording.webm");
+      formData.append("today", getTodayString());
 
       const res = await fetch("/api/voice", {
         method: "POST",
@@ -95,7 +97,7 @@ export function VoiceModal({ isOpen, onClose, onConfirmTask }: VoiceModalProps) 
       setTranscribedText(result.transcription || "");
       setPreviewTask({
         title: result.extracted.title || "Attività senza titolo",
-        date: result.extracted.date || new Date().toISOString().slice(0, 10),
+        date: result.extracted.date || getTodayString(),
         time: result.extracted.time || null,
         kind: (result.extracted.kind as TaskKindId) || "altro",
         project: result.extracted.project || null,
@@ -119,7 +121,7 @@ export function VoiceModal({ isOpen, onClose, onConfirmTask }: VoiceModalProps) 
       const res = await fetch("/api/voice", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: manualText.trim() }),
+        body: JSON.stringify({ text: manualText.trim(), today: getTodayString() }),
       });
 
       if (!res.ok) {
@@ -131,7 +133,7 @@ export function VoiceModal({ isOpen, onClose, onConfirmTask }: VoiceModalProps) 
       setTranscribedText(manualText.trim());
       setPreviewTask({
         title: result.extracted.title || manualText.trim(),
-        date: result.extracted.date || new Date().toISOString().slice(0, 10),
+        date: result.extracted.date || getTodayString(),
         time: result.extracted.time || null,
         kind: (result.extracted.kind as TaskKindId) || "altro",
         project: result.extracted.project || null,

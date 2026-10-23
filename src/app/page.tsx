@@ -18,20 +18,52 @@ import { InfoModal } from "@/components/InfoModal";
 import { SettingsModal } from "@/components/SettingsModal";
 import { MascotCosmino } from "@/components/MascotCosmino";
 import { Loader2, AlertCircle, WifiOff } from "lucide-react";
+import { getTodayString } from "@/lib/date-utils";
 
 export default function HomePage() {
   const router = useRouter();
   const supabase = createClient();
 
   const [currentView, setCurrentView] = useState<ViewMode>("day");
-  const [selectedDate, setSelectedDate] = useState<string>(() => {
-    return new Date().toISOString().slice(0, 10);
-  });
+  const [todayStr, setTodayStr] = useState<string>(() => getTodayString());
+  const [selectedDate, setSelectedDate] = useState<string>(() => getTodayString());
   const [tasks, setTasks] = useState<Task[]>([]);
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [loading, setLoading] = useState(true);
   const [isOffline, setIsOffline] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+
+  // Monitoraggio passaggio mezzanotte e cambio data automatico
+  useEffect(() => {
+    const checkDateChange = () => {
+      const actualToday = getTodayString();
+      setTodayStr((prevToday) => {
+        if (actualToday !== prevToday) {
+          // Se la data odierna è cambiata (è passata la mezzanotte):
+          // se l'utente stava guardando la data di ieri che era "oggi", avanziamo automaticamente ad "oggi"
+          setSelectedDate((prevSelected) => (prevSelected === prevToday ? actualToday : prevSelected));
+          return actualToday;
+        }
+        return prevToday;
+      });
+    };
+
+    const interval = setInterval(checkDateChange, 15000); // Controllo ogni 15 secondi
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        checkDateChange();
+      }
+    };
+
+    window.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("focus", handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("focus", handleVisibility);
+    };
+  }, []);
 
   // Filtri e ricerca
   const [searchQuery, setSearchQuery] = useState("");
@@ -157,15 +189,13 @@ export default function HomePage() {
 
   // Attività passate non completate ("Da recuperare")
   const overdueTasks = useMemo(() => {
-    const todayStr = new Date().toISOString().slice(0, 10);
     return filteredTasks.filter((t) => t.date < todayStr && t.status === "todo");
-  }, [filteredTasks]);
+  }, [filteredTasks, todayStr]);
 
   // Conteggio compiti oggi per badge nav
   const todayCount = useMemo(() => {
-    const todayStr = new Date().toISOString().slice(0, 10);
     return tasks.filter((t) => t.date === todayStr && t.status === "todo").length;
-  }, [tasks]);
+  }, [tasks, todayStr]);
 
   // Toggle stato (todo <-> done) con aggiornamento ottimistico
   const handleToggleStatus = async (task: Task) => {
@@ -190,15 +220,15 @@ export default function HomePage() {
 
   // Sposta attività arretrata a oggi
   const handleMoveToToday = async (task: Task) => {
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const currentToday = getTodayString();
     const updatedTasks = tasks.map((t) =>
-      t.id === task.id ? { ...t, date: todayStr } : t
+      t.id === task.id ? { ...t, date: currentToday } : t
     );
     setTasks(updatedTasks);
     offlineStorage.saveTasks(updatedTasks);
 
     try {
-      await supabase.from("tasks").update({ date: todayStr }).eq("id", task.id);
+      await supabase.from("tasks").update({ date: currentToday }).eq("id", task.id);
     } catch (err) {
       console.error("Errore spostamento a oggi:", err);
     }
@@ -341,7 +371,7 @@ export default function HomePage() {
   };
 
   const handleCreateTaskFromIdea = async (idea: Idea) => {
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = getTodayString();
     const taskKind =
       idea.project === "vignetta"
         ? "vignetta"
@@ -484,7 +514,12 @@ export default function HomePage() {
       {/* Barra di navigazione in basso (Oggi, Settimana, Mese, Idee) */}
       <BottomNav
         currentView={currentView}
-        onChangeView={setCurrentView}
+        onChangeView={(view) => {
+          if (view === "day") {
+            setSelectedDate(getTodayString());
+          }
+          setCurrentView(view);
+        }}
         todayCount={todayCount}
         ideasCount={ideas.filter((i) => i.status === "nuova").length}
       />
