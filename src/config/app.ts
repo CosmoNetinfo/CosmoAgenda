@@ -110,7 +110,7 @@ export const APP_CONFIG = {
   ] as const,
 
   // Progetti predefiniti suggeriti (l'utente può comunque inserire liberamente qualsiasi nome)
-  defaultProjects: ["Cosmonet", "Solfège", "Personale", "Studio"],
+  defaultProjects: ["Cosmonet", "Solfege", "Memora", "Tiki Taka", "Li Bardasci", "GitHub", "Sicurezza"],
 
   // Configurazione per la sezione "Idee e link"
   ideaProjects: [

@@ -218,21 +218,44 @@ export default function HomePage() {
     }
   };
 
-  // Sposta attività arretrata a oggi
-  const handleMoveToToday = async (task: Task) => {
-    const currentToday = getTodayString();
-    const updatedTasks = tasks.map((t) =>
-      t.id === task.id ? { ...t, date: currentToday } : t
-    );
-    setTasks(updatedTasks);
-    offlineStorage.saveTasks(updatedTasks);
+  // Sposta una o più attività a una data (aggiornamento funzionale: sicuro anche se chiamato più volte di fila)
+  const handlePostpone = async (items: Task | Task[], toDate: string) => {
+    const list = Array.isArray(items) ? items : [items];
+    const byId = new Map(list.map((t) => [t.id, t]));
+    setTasks((prev) => {
+      const next = prev.map((t) => {
+        const orig = byId.get(t.id);
+        if (!orig || orig.date === toDate) return t;
+        return {
+          ...t,
+          date: toDate,
+          original_date: orig.original_date || orig.date,
+          postponed_count: (orig.postponed_count || 0) + 1,
+        };
+      });
+      offlineStorage.saveTasks(next);
+      return next;
+    });
 
-    try {
-      await supabase.from("tasks").update({ date: currentToday }).eq("id", task.id);
-    } catch (err) {
-      console.error("Errore spostamento a oggi:", err);
-    }
+    await Promise.all(
+      list
+        .filter((t) => t.date !== toDate)
+        .map(async (t) => {
+          const { error } = await supabase
+            .from("tasks")
+            .update({
+              date: toDate,
+              original_date: t.original_date || t.date,
+              postponed_count: (t.postponed_count || 0) + 1,
+            })
+            .eq("id", t.id);
+          if (error) console.error("Errore posticipo:", error);
+        })
+    );
   };
+
+  // Sposta attività arretrata a oggi
+  const handleMoveToToday = (task: Task) => handlePostpone(task, getTodayString());
 
   // Salvataggio attività (Crea o Aggiorna)
   const handleSaveTask = async (data: CreateTaskInput | UpdateTaskInput) => {
@@ -475,6 +498,7 @@ export default function HomePage() {
             onToggleStatus={handleToggleStatus}
             onClickTask={handleClickTask}
             onMoveToToday={handleMoveToToday}
+            onPostpone={handlePostpone}
             onOpenNewTask={() => handleOpenNewTask(selectedDate)}
           />
         )}

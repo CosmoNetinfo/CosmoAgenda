@@ -1,8 +1,9 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { Task } from "@/types";
 import { APP_CONFIG } from "@/config/app";
+import { addDays, getMonday, getLocalDateString } from "@/lib/date-utils";
 import {
   Clock,
   CheckCircle2,
@@ -19,6 +20,8 @@ import {
   CheckSquare,
   Bot,
   ListTodo,
+  CalendarClock,
+  Repeat,
 } from "lucide-react";
 
 interface TaskCardProps {
@@ -26,6 +29,7 @@ interface TaskCardProps {
   onToggleStatus: (task: Task) => void;
   onClick: (task: Task) => void;
   onMoveToToday?: (task: Task) => void;
+  onPostpone?: (items: Task | Task[], toDate: string) => void;
   isOverdue?: boolean;
 }
 
@@ -34,8 +38,10 @@ export function TaskCard({
   onToggleStatus,
   onClick,
   onMoveToToday,
+  onPostpone,
   isOverdue = false,
 }: TaskCardProps) {
+  const [showPostpone, setShowPostpone] = useState(false);
   const isDone = task.status === "done";
   const kindConfig =
     APP_CONFIG.kinds.find((k) => k.id === task.kind) || APP_CONFIG.kinds[APP_CONFIG.kinds.length - 1];
@@ -152,6 +158,17 @@ export function TaskCard({
             </span>
           )}
 
+          {/* Quante volte è stata rimandata */}
+          {(task.postponed_count || 0) > 0 && !isDone && (
+            <span
+              className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#FFF3C4] text-[#554316] border border-[#F3E19C]"
+              title={task.original_date ? `Data originale: ${task.original_date}` : "Rimandata"}
+            >
+              <Repeat size={10} className="mr-0.5" />
+              rimandata {task.postponed_count}x
+            </span>
+          )}
+
           {/* Badge creato da AI (Claude/Assistant) */}
           {task.created_by && task.created_by !== "user" && (
             <span
@@ -211,6 +228,61 @@ export function TaskCard({
         >
           Sposta a oggi
         </button>
+      )}
+
+      {/* Posticipa (per le attività da fare, non arretrate) */}
+      {!isOverdue && !isDone && onPostpone && (
+        <div className="self-center flex-shrink-0 relative" onClick={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            onClick={() => setShowPostpone((v) => !v)}
+            className="p-2 rounded-2xl text-plum-500 hover:bg-cream-100 transition-colors"
+            title="Posticipa"
+          >
+            <CalendarClock size={18} />
+          </button>
+          {showPostpone && (
+            <div className="absolute right-0 top-10 z-30 w-44 bg-white rounded-2xl border border-cream-300 shadow-card p-1.5 text-xs font-semibold text-plum-800">
+              {[
+                { label: "Domani", date: addDays(task.date, 1) },
+                { label: "Tra 2 giorni", date: addDays(task.date, 2) },
+                {
+                  label: "Lunedì prossimo",
+                  date: getLocalDateString(
+                    new Date(getMonday(new Date(task.date + "T12:00:00")).getTime() + 7 * 86400000)
+                  ),
+                },
+                { label: "Tra una settimana", date: addDays(task.date, 7) },
+              ].map((o) => (
+                <button
+                  key={o.label}
+                  type="button"
+                  className="w-full text-left px-3 py-2 rounded-xl hover:bg-cream-100"
+                  onClick={() => {
+                    setShowPostpone(false);
+                    onPostpone(task, o.date);
+                  }}
+                >
+                  {o.label}
+                </button>
+              ))}
+              <label className="block px-3 py-2 rounded-xl hover:bg-cream-100">
+                Scegli data…
+                <input
+                  type="date"
+                  className="mt-1 w-full text-xs"
+                  min={task.date}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      setShowPostpone(false);
+                      onPostpone(task, e.target.value);
+                    }
+                  }}
+                />
+              </label>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
