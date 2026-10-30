@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useState } from "react";
+import { createPortal } from "react-dom";
 import { Task } from "@/types";
 import { APP_CONFIG } from "@/config/app";
-import { addDays, getMonday, getLocalDateString } from "@/lib/date-utils";
+import { addDays, getMonday, getLocalDateString, parseLocalDate } from "@/lib/date-utils";
 import {
   Clock,
   CheckCircle2,
@@ -42,6 +43,18 @@ export function TaskCard({
   isOverdue = false,
 }: TaskCardProps) {
   const [showPostpone, setShowPostpone] = useState(false);
+  const [customDate, setCustomDate] = useState("");
+
+  // Opzioni di posticipo (lunedì prossimo calcolato per giorni, senza millisecondi: nessun problema con l'ora legale)
+  const nextMonday = addDays(getLocalDateString(getMonday(parseLocalDate(task.date))), 7);
+  const postponeOptions = [
+    { label: "Domani", date: addDays(task.date, 1) },
+    { label: "Tra 2 giorni", date: addDays(task.date, 2) },
+    { label: "Lunedì prossimo", date: nextMonday },
+    { label: "Tra una settimana", date: addDays(task.date, 7) },
+  ];
+  const formatShort = (d: string) =>
+    parseLocalDate(d).toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" });
   const isDone = task.status === "done";
   const kindConfig =
     APP_CONFIG.kinds.find((k) => k.id === task.kind) || APP_CONFIG.kinds[APP_CONFIG.kinds.length - 1];
@@ -241,47 +254,66 @@ export function TaskCard({
           >
             <CalendarClock size={18} />
           </button>
-          {showPostpone && (
-            <div className="absolute right-0 top-10 z-30 w-44 bg-white rounded-2xl border border-cream-300 shadow-card p-1.5 text-xs font-semibold text-plum-800">
-              {[
-                { label: "Domani", date: addDays(task.date, 1) },
-                { label: "Tra 2 giorni", date: addDays(task.date, 2) },
-                {
-                  label: "Lunedì prossimo",
-                  date: getLocalDateString(
-                    new Date(getMonday(new Date(task.date + "T12:00:00")).getTime() + 7 * 86400000)
-                  ),
-                },
-                { label: "Tra una settimana", date: addDays(task.date, 7) },
-              ].map((o) => (
-                <button
-                  key={o.label}
-                  type="button"
-                  className="w-full text-left px-3 py-2 rounded-xl hover:bg-cream-100"
-                  onClick={() => {
-                    setShowPostpone(false);
-                    onPostpone(task, o.date);
-                  }}
+          {showPostpone &&
+            createPortal(
+              <div
+                className="fixed inset-0 z-[60] flex items-end justify-center bg-black/30"
+                onClick={() => setShowPostpone(false)}
+              >
+                <div
+                  className="w-full max-w-md bg-white rounded-t-3xl p-4 pb-8 shadow-floating"
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  {o.label}
-                </button>
-              ))}
-              <label className="block px-3 py-2 rounded-xl hover:bg-cream-100">
-                Scegli data…
-                <input
-                  type="date"
-                  className="mt-1 w-full text-xs"
-                  min={task.date}
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      setShowPostpone(false);
-                      onPostpone(task, e.target.value);
-                    }
-                  }}
-                />
-              </label>
-            </div>
-          )}
+                  <p className="text-sm font-bold text-plum-900 mb-1">Posticipa</p>
+                  <p className="text-xs text-plum-600 mb-3 line-clamp-1">{task.title}</p>
+                  <div className="space-y-1.5">
+                    {postponeOptions.map((o) => (
+                      <button
+                        key={o.label}
+                        type="button"
+                        className="w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-cream-100 text-sm font-semibold text-plum-800 active:scale-[0.99]"
+                        onClick={() => {
+                          setShowPostpone(false);
+                          onPostpone(task, o.date);
+                        }}
+                      >
+                        <span>{o.label}</span>
+                        <span className="text-xs font-medium text-plum-500">{formatShort(o.date)}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="mt-3 flex items-center gap-2">
+                    <input
+                      type="date"
+                      className="flex-1 px-3 py-2.5 rounded-2xl border border-cream-300 text-sm"
+                      min={task.date}
+                      value={customDate}
+                      onChange={(e) => setCustomDate(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      disabled={!customDate || customDate === task.date}
+                      className="px-4 py-2.5 rounded-2xl bg-cosmo-alien text-white text-sm font-bold disabled:opacity-40"
+                      onClick={() => {
+                        setShowPostpone(false);
+                        onPostpone(task, customDate);
+                        setCustomDate("");
+                      }}
+                    >
+                      Conferma
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    className="w-full mt-3 py-2 text-xs font-semibold text-plum-500"
+                    onClick={() => setShowPostpone(false)}
+                  >
+                    Annulla
+                  </button>
+                </div>
+              </div>,
+              document.body
+            )}
         </div>
       )}
     </div>
