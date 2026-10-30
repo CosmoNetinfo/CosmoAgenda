@@ -27,6 +27,9 @@ export interface Task {
   project?: string | null;
   priority: TaskPriorityId;
   repeat_rule?: string | null;
+  pub_status?: PubStatus | null; // coda di pubblicazione
+  link?: string | null; // link dell'articolo da pubblicare
+  social_text?: string | null; // testo del post per i social
   postponed_count?: number; // quante volte è stata posticipata
   original_date?: string | null; // data di partenza prima del primo posticipo
   subtasks: Subtask[];
@@ -37,6 +40,8 @@ export interface Task {
   created_at: string;
   updated_at: string;
 }
+
+export type PubStatus = "da_preparare" | "pronto" | "pubblicato";
 
 export type IdeaProject = "articolo-cosmonet" | "vignetta" | "lo-sapevi-che" | "altro";
 export type IdeaStatus = "nuova" | "in_lavorazione" | "pronta" | "scartata";
@@ -64,6 +69,9 @@ export interface CreateTaskInput {
   project?: string | null;
   priority?: TaskPriorityId;
   repeat_rule?: string | null;
+  pub_status?: PubStatus | null;
+  link?: string | null;
+  social_text?: string | null;
   subtasks?: Subtask[];
   status?: TaskStatusId;
   created_by?: string;
@@ -78,10 +86,13 @@ export interface UpdateTaskInput {
   project?: string | null;
   priority?: TaskPriorityId;
   repeat_rule?: string | null;
+  pub_status?: PubStatus | null;
+  link?: string | null;
+  social_text?: string | null;
   subtasks?: Subtask[];
   status?: TaskStatusId;
   done_at?: string | null;
   created_by?: string;
 }
 
-export type ViewMode = "day" | "week" | "month" | "ideas";
+export type ViewMode = "day" | "week" | "month" | "ideas" | "queue";

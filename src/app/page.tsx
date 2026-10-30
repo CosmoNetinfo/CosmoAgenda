@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Task, ViewMode, CreateTaskInput, UpdateTaskInput, Idea } from "@/types";
+import { Task, ViewMode, CreateTaskInput, UpdateTaskInput, Idea, PubStatus } from "@/types";
 import { TaskStatusId } from "@/config/app";
 import { createClient } from "@/lib/supabase/client";
 import { offlineStorage } from "@/lib/offline-storage";
@@ -12,6 +12,8 @@ import { DayView } from "@/components/DayView";
 import { WeekView } from "@/components/WeekView";
 import { MonthView } from "@/components/MonthView";
 import { IdeasView } from "@/components/IdeasView";
+import { QueueView } from "@/components/QueueView";
+import { nextRepeatDate, buildNextTask } from "@/lib/repeat";
 import { TaskModal } from "@/components/TaskModal";
 import { VoiceModal } from "@/components/VoiceModal";
 import { InfoModal } from "@/components/InfoModal";
@@ -197,25 +199,69 @@ export default function HomePage() {
     return tasks.filter((t) => t.date === todayStr && t.status === "todo").length;
   }, [tasks, todayStr]);
 
-  // Toggle stato (todo <-> done) con aggiornamento ottimistico
-  const handleToggleStatus = async (task: Task) => {
+  // Se l'attività si ripete, crea la prossima occorrenza (senza duplicati)
+  const spawnNextOccurrence = async (t: Task) => {
+    if (!t.repeat_rule) return;
+    const next = nextRepeatDate(t.date, t.repeat_rule, getTodayString());
+    if (!next) return;
+    const { data: dup } = await supabase
+      .from("tasks")
+      .select("id")
+      .eq("user_id", t.user_id)
+      .eq("title", t.title)
+      .eq("date", next)
+      .limit(1);
+    if (dup && dup.length > 0) return;
+    const { data: inserted } = await supabase
+      .from("tasks")
+      .insert(buildNextTask(t, next))
+      .select("*, task_files(*)")
+      .single();
+    if (inserted) {
+      setTasks((prev) => {
+        const list = [...prev, inserted as Task];
+        offlineStorage.saveTasks(list);
+        return list;
+      });
+    }
+  };
+
+  // Aggiornamento rapido di una attività (ottimistico) + prossima occorrenza se si ripete
+  const handleQuickUpdate = async (task: Task, patch: Partial<Task>) => {
+    setTasks((prev) => {
+      const list = prev.map((t) => (t.id === task.id ? { ...t, ...patch } : t));
+      offlineStorage.saveTasks(list);
+      return list;
+    });
+    try {
+      await supabase.from("tasks").update(patch).eq("id", task.id);
+    } catch (err) {
+      console.error("Errore aggiornamento:", err);
+    }
+    if (task.status === "todo" && patch.status && patch.status !== "todo") {
+      await spawnNextOccurrence({ ...task, ...patch } as Task);
+    }
+  };
+
+  // Toggle stato (todo <-> done)
+  const handleToggleStatus = (task: Task) => {
     const nextStatus: TaskStatusId = task.status === "done" ? "todo" : "done";
     const doneAt = nextStatus === "done" ? new Date().toISOString() : null;
+    return handleQuickUpdate(task, { status: nextStatus, done_at: doneAt });
+  };
 
-    const updatedTasks: Task[] = tasks.map((t) =>
-      t.id === task.id ? { ...t, status: nextStatus, done_at: doneAt } : t
-    );
-    setTasks(updatedTasks);
-    offlineStorage.saveTasks(updatedTasks);
-
-    try {
-      await supabase
-        .from("tasks")
-        .update({ status: nextStatus, done_at: doneAt })
-        .eq("id", task.id);
-    } catch (err) {
-      console.error("Errore sincronizzazione status:", err);
+  // Cambio stato nella coda di pubblicazione (pubblicato = attività completata)
+  const handleSetPubStatus = (task: Task, pubStatus: PubStatus) => {
+    const patch: Partial<Task> = { pub_status: pubStatus };
+    if (pubStatus === "pubblicato" && task.status === "todo") {
+      patch.status = "done";
+      patch.done_at = new Date().toISOString();
     }
+    if (pubStatus !== "pubblicato" && task.status === "done") {
+      patch.status = "todo";
+      patch.done_at = null;
+    }
+    return handleQuickUpdate(task, patch);
   };
 
   // Sposta una o più attività a una data (aggiornamento funzionale: sicuro anche se chiamato più volte di fila)
@@ -290,6 +336,10 @@ export default function HomePage() {
         .eq("id", editingTask.id)
         .eq("user_id", session.user.id);
 
+      if (editingTask.status === "todo" && updatedItem.status !== "todo") {
+        await spawnNextOccurrence(updatedItem);
+      }
+
       return updatedItem;
     } else {
       // Creazione nuovo
@@ -304,6 +354,9 @@ export default function HomePage() {
         project: data.project || null,
         priority: data.priority || "normale",
         repeat_rule: data.repeat_rule || null,
+        pub_status: data.pub_status || null,
+        link: data.link || null,
+        social_text: data.social_text || null,
         subtasks: data.subtasks || [],
         task_files: [],
         notes: data.notes || null,
@@ -328,6 +381,9 @@ export default function HomePage() {
           project: newItem.project,
           priority: newItem.priority,
           repeat_rule: newItem.repeat_rule,
+          pub_status: newItem.pub_status,
+          link: newItem.link,
+          social_text: newItem.social_text,
           subtasks: newItem.subtasks,
           notes: newItem.notes,
           status: newItem.status,
@@ -525,6 +581,14 @@ export default function HomePage() {
           />
         )}
 
+        {currentView === "queue" && (
+          <QueueView
+            tasks={tasks}
+            onClickTask={handleClickTask}
+            onSetPubStatus={handleSetPubStatus}
+          />
+        )}
+
         {currentView === "ideas" && (
           <IdeasView
             ideas={ideas}
@@ -546,6 +610,7 @@ export default function HomePage() {
         }}
         todayCount={todayCount}
         ideasCount={ideas.filter((i) => i.status === "nuova").length}
+        queueCount={tasks.filter((t) => t.pub_status === "pronto" || t.pub_status === "da_preparare").length}
       />
 
       {/* Modale Aggiungi / Modifica Attività */}

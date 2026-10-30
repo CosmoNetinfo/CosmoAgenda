@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { WEEKDAYS, CONTENT_KINDS, parseRepeatDays, buildRepeatRule } from "@/lib/repeat";
 import { Task, CreateTaskInput, UpdateTaskInput, Subtask, TaskFile } from "@/types";
 import { APP_CONFIG, TaskKindId, TaskPriorityId, TaskStatusId } from "@/config/app";
 import { createClient } from "@/lib/supabase/client";
@@ -60,6 +61,10 @@ export function TaskModal({
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
   const [status, setStatus] = useState<TaskStatusId>("todo");
+  const [repeatDays, setRepeatDays] = useState<number[]>([]);
+  const [pubStatus, setPubStatus] = useState<string>("");
+  const [link, setLink] = useState("");
+  const [socialText, setSocialText] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -85,6 +90,10 @@ export function TaskModal({
       setNotes(initialTask.notes || "");
       setSubtasks(initialTask.subtasks || []);
       setStatus(initialTask.status);
+      setRepeatDays(parseRepeatDays(initialTask.repeat_rule));
+      setPubStatus(initialTask.pub_status || "");
+      setLink(initialTask.link || "");
+      setSocialText(initialTask.social_text || "");
       setFiles(initialTask.task_files || []);
 
       // Ricarica i file da Supabase per sicurezza
@@ -106,6 +115,10 @@ export function TaskModal({
       setNotes("");
       setSubtasks([]);
       setStatus("todo");
+      setRepeatDays([]);
+      setPubStatus("");
+      setLink("");
+      setSocialText("");
       setFiles([]);
     }
     setFileError(null);
@@ -216,6 +229,10 @@ export function TaskModal({
           notes: notes.trim() ? notes.trim() : null,
           subtasks,
           status,
+          repeat_rule: buildRepeatRule(repeatDays),
+          pub_status: CONTENT_KINDS.includes(kind) && pubStatus ? (pubStatus as any) : null,
+          link: CONTENT_KINDS.includes(kind) && link.trim() ? link.trim() : null,
+          social_text: CONTENT_KINDS.includes(kind) && socialText.trim() ? socialText.trim() : null,
         });
 
         if (savedTask && savedTask.id) {
@@ -333,6 +350,10 @@ export function TaskModal({
         notes: notes.trim() ? notes.trim() : null,
         subtasks,
         status,
+        repeat_rule: buildRepeatRule(repeatDays),
+        pub_status: CONTENT_KINDS.includes(kind) && pubStatus ? (pubStatus as any) : null,
+        link: CONTENT_KINDS.includes(kind) && link.trim() ? link.trim() : null,
+        social_text: CONTENT_KINDS.includes(kind) && socialText.trim() ? socialText.trim() : null,
       });
       onClose();
     } catch (err) {
@@ -436,7 +457,10 @@ export function TaskModal({
                   <button
                     key={k.id}
                     type="button"
-                    onClick={() => setKind(k.id)}
+                    onClick={() => {
+                      setKind(k.id);
+                      if (!pubStatus && CONTENT_KINDS.includes(k.id)) setPubStatus("da_preparare");
+                    }}
                     className={`text-xs px-3 py-1.5 rounded-full font-semibold transition-all border ${
                       isSelected
                         ? "shadow-sm scale-105"
@@ -516,6 +540,75 @@ export function TaskModal({
               className="w-full text-xs font-medium text-plum-900 bg-white rounded-2xl p-3 border border-cream-300 focus:outline-none focus:ring-2 focus:ring-cosmo-alien/30 shadow-2xs resize-none"
             />
           </div>
+
+          {/* Ripetizione (rubriche) */}
+          <div>
+            <label className="block text-xs font-bold text-plum-700 mb-1.5">↻ Ripeti (giorni della settimana)</label>
+            <div className="flex gap-1.5 flex-wrap">
+              {WEEKDAYS.map((d) => {
+                const on = repeatDays.includes(d.v);
+                return (
+                  <button
+                    key={d.v}
+                    type="button"
+                    onClick={() =>
+                      setRepeatDays((prev) => (prev.includes(d.v) ? prev.filter((x) => x !== d.v) : [...prev, d.v]))
+                    }
+                    className={`px-3 py-1.5 rounded-2xl text-xs font-bold border transition-all ${
+                      on ? "bg-plum-800 text-white border-plum-800" : "bg-white text-plum-600 border-cream-300"
+                    }`}
+                  >
+                    {d.label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[10px] text-plum-500 mt-1">
+              {repeatDays.length > 0
+                ? "Quando la completi o la salti, la prossima si crea da sola."
+                : "Nessuna ripetizione."}
+            </p>
+          </div>
+
+          {/* Coda di pubblicazione (solo per contenuti) */}
+          {CONTENT_KINDS.includes(kind) && (
+            <div className="p-4 rounded-3xl bg-white border border-cream-300 shadow-soft space-y-3">
+              <h4 className="text-xs font-bold text-plum-900">Coda di pubblicazione</h4>
+              <div className="flex gap-1.5 flex-wrap">
+                {[
+                  { v: "", l: "Fuori coda" },
+                  { v: "da_preparare", l: "Da preparare" },
+                  { v: "pronto", l: "Pronto" },
+                  { v: "pubblicato", l: "Pubblicato" },
+                ].map((o) => (
+                  <button
+                    key={o.v}
+                    type="button"
+                    onClick={() => setPubStatus(o.v)}
+                    className={`px-3 py-1.5 rounded-2xl text-xs font-bold border transition-all ${
+                      pubStatus === o.v ? "bg-plum-800 text-white border-plum-800" : "bg-white text-plum-600 border-cream-300"
+                    }`}
+                  >
+                    {o.l}
+                  </button>
+                ))}
+              </div>
+              <input
+                type="url"
+                placeholder="Link dell'articolo (https://...)"
+                value={link}
+                onChange={(e) => setLink(e.target.value)}
+                className="w-full text-xs font-medium text-plum-900 bg-white rounded-2xl p-3 border border-cream-300 focus:outline-none focus:ring-2 focus:ring-cosmo-alien/30"
+              />
+              <textarea
+                rows={3}
+                placeholder="Testo del post per i social..."
+                value={socialText}
+                onChange={(e) => setSocialText(e.target.value)}
+                className="w-full text-xs font-medium text-plum-900 bg-white rounded-2xl p-3 border border-cream-300 focus:outline-none focus:ring-2 focus:ring-cosmo-alien/30 resize-none"
+              />
+            </div>
+          )}
 
           {/* SEZIONE FILE MARKDOWN (.MD) ALLEGATI (Requisito 2) */}
           <div className="p-4 rounded-3xl bg-white border border-cream-300 shadow-soft space-y-3">

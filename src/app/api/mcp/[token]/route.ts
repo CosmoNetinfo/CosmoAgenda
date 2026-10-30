@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendPushToUser } from "@/lib/push";
 import { timingSafeEqual } from "crypto";
+import { REPEAT_RULE_REGEX, CONTENT_KINDS, nextRepeatDate, buildNextTask } from "@/lib/repeat";
 
 // Server MCP remoto per Claude, Grok e assistenti IA
 // Trasporto HTTP Streamable / JSON-RPC 2.0 conforme alle specifiche MCP 2024-11-05
@@ -54,6 +55,23 @@ const MCP_TOOLS = [
           type: "string",
           description: "Note, dettagli o link facoltativi",
         },
+        link: {
+          type: "string",
+          description: "Link dell'articolo/contenuto da pubblicare (coda di pubblicazione)",
+        },
+        social_text: {
+          type: "string",
+          description: "Testo del post per i social",
+        },
+        pub_status: {
+          type: "string",
+          enum: ["da_preparare", "pronto", "pubblicato"],
+          description: "Stato nella coda di pubblicazione (default da_preparare per articolo, vignetta, lo-sapevi-che, consiglio-rapido, flash-news, social)",
+        },
+        repeat_rule: {
+          type: "string",
+          description: "Ripetizione: 'daily' oppure 'weekly:2,5' (0=domenica ... 6=sabato). Alla chiusura dell'attività si crea la successiva.",
+        },
       },
       required: ["title", "date"],
     },
@@ -84,6 +102,11 @@ const MCP_TOOLS = [
         kind: {
           type: "string",
           description: "Filtra per tipo di attività",
+        },
+        pub_status: {
+          type: "string",
+          enum: ["in_coda", "da_preparare", "pronto", "pubblicato"],
+          description: "Coda di pubblicazione: in_coda = da_preparare + pronto",
         },
       },
     },
@@ -120,6 +143,10 @@ const MCP_TOOLS = [
         priority: { type: "string", enum: ["bassa", "normale", "alta"] },
         notes: { type: "string" },
         status: { type: "string", enum: ["todo", "done", "skipped"] },
+        link: { type: "string" },
+        social_text: { type: "string" },
+        pub_status: { type: "string", enum: ["da_preparare", "pronto", "pubblicato"] },
+        repeat_rule: { type: "string", description: "'daily', 'weekly:2,5' oppure stringa vuota per toglierla" },
       },
       required: ["task_id"],
     },
@@ -394,6 +421,19 @@ async function assertTaskOwned(supabase: any, taskId: string, ownerUserId: strin
   if (!data) throw new Error("Attività non trovata");
 }
 
+// Se l'attività ripete, crea la prossima occorrenza (senza duplicati)
+async function spawnNextOccurrence(supabase: any, task: any) {
+  if (!task?.repeat_rule) return null;
+  const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Rome" });
+  const next = nextRepeatDate(task.date, task.repeat_rule, today);
+  if (!next) return null;
+  const { data: dup } = await supabase
+    .from("tasks").select("id").eq("user_id", task.user_id).eq("title", task.title).eq("date", next).limit(1);
+  if (dup && dup.length > 0) return null;
+  const { data } = await supabase.from("tasks").insert(buildNextTask(task, next)).select().single();
+  return data || null;
+}
+
 // Handler per l'esecuzione degli strumenti
 async function executeTool(name: string, args: any) {
   const supabase = createAdminClient();
@@ -401,7 +441,8 @@ async function executeTool(name: string, args: any) {
 
   switch (name) {
     case "add_task": {
-      const { title, date, time, kind, project, priority, notes } = args;
+      const { title, date, time, kind, project, priority, notes, link, social_text, pub_status, repeat_rule } = args;
+      if (repeat_rule && !REPEAT_RULE_REGEX.test(repeat_rule)) throw new Error("repeat_rule non valida: usa 'daily' o 'weekly:2,5'");
       const { data, error } = await supabase
         .from("tasks")
         .insert({
@@ -413,6 +454,10 @@ async function executeTool(name: string, args: any) {
           project: project || null,
           priority: priority || "normale",
           notes: notes || null,
+          link: link || null,
+          social_text: social_text || null,
+          pub_status: pub_status || (CONTENT_KINDS.includes(kind || "altro") ? "da_preparare" : null),
+          repeat_rule: repeat_rule || null,
           status: "todo",
           created_by: "claude",
         })
@@ -441,7 +486,7 @@ async function executeTool(name: string, args: any) {
     }
 
     case "list_tasks": {
-      const { start_date, end_date, status, project, kind } = args;
+      const { start_date, end_date, status, project, kind, pub_status } = args;
       let query = supabase.from("tasks").select("*").eq("user_id", ownerUserId);
 
       if (start_date) query = query.gte("date", start_date);
@@ -449,6 +494,8 @@ async function executeTool(name: string, args: any) {
       if (status && status !== "all") query = query.eq("status", status);
       if (project) query = query.ilike("project", `%${project}%`);
       if (kind) query = query.eq("kind", kind);
+      if (pub_status === "in_coda") query = query.in("pub_status", ["da_preparare", "pronto"]);
+      else if (pub_status) query = query.eq("pub_status", pub_status);
 
       query = query.order("date", { ascending: true }).order("time", { ascending: true, nullsFirst: false });
 
@@ -477,10 +524,13 @@ async function executeTool(name: string, args: any) {
 
     case "update_task": {
       const { task_id, ...rest } = args;
-      const allowed = ["title", "notes", "date", "time", "kind", "project", "priority", "status"];
+      const allowed = ["title", "notes", "date", "time", "kind", "project", "priority", "status", "link", "social_text", "pub_status", "repeat_rule"];
       const updates: Record<string, any> = {};
       for (const k of allowed) if (rest[k] !== undefined) updates[k] = rest[k] === "" ? null : rest[k];
       if (updates.title === null) delete updates.title;
+      if (updates.repeat_rule && !REPEAT_RULE_REGEX.test(updates.repeat_rule)) throw new Error("repeat_rule non valida: usa 'daily' o 'weekly:2,5'");
+      if (updates.pub_status === null) delete updates.pub_status;
+      if (updates.pub_status === "pubblicato" && !updates.status) updates.status = "done";
       if (updates.date && rest.date && updates.date !== undefined) {
         // cambio data a mano = posticipo/spostamento: tienilo tracciato
         const { data: cur } = await supabase.from("tasks").select("date, original_date, postponed_count").eq("id", task_id).eq("user_id", ownerUserId).single();
@@ -498,7 +548,9 @@ async function executeTool(name: string, args: any) {
         .single();
 
       if (error) throw error;
-      return { success: true, task: data };
+      let next_task = null;
+      if (data.status === "done" || data.status === "skipped") next_task = await spawnNextOccurrence(supabase, data);
+      return { success: true, task: data, next_task };
     }
 
     case "postpone_task": {
@@ -558,7 +610,8 @@ async function executeTool(name: string, args: any) {
         .single();
 
       if (error) throw error;
-      return { success: true, message: `Attività "${data.title}" completata!`, task: data };
+      const next_task = await spawnNextOccurrence(supabase, data);
+      return { success: true, message: `Attività "${data.title}" completata!${next_task ? ` Prossima: ${next_task.date}` : ""}`, task: data, next_task };
     }
 
     case "skip_task": {
@@ -572,7 +625,8 @@ async function executeTool(name: string, args: any) {
         .single();
 
       if (error) throw error;
-      return { success: true, message: `Attività "${data.title}" saltata.`, task: data };
+      const next_task = await spawnNextOccurrence(supabase, data);
+      return { success: true, message: `Attività "${data.title}" saltata.${next_task ? ` Prossima: ${next_task.date}` : ""}`, task: data, next_task };
     }
 
     case "add_note": {

@@ -2,13 +2,14 @@
 
 import React from "react";
 import { ViewMode } from "@/types";
-import { CalendarCheck, CalendarDays, CalendarRange, Lightbulb } from "lucide-react";
+import { CalendarCheck, CalendarDays, CalendarRange, Lightbulb, Send } from "lucide-react";
 
 interface BottomNavProps {
   currentView: ViewMode;
   onChangeView: (view: ViewMode) => void;
   todayCount?: number;
   ideasCount?: number;
+  queueCount?: number;
 }
 
 export function BottomNav({
@@ -16,6 +17,7 @@ export function BottomNav({
   onChangeView,
   todayCount,
   ideasCount,
+  queueCount,
 }: BottomNavProps) {
   const tabs = [
     {
@@ -40,6 +42,12 @@ export function BottomNav({
       icon: Lightbulb,
       badge: ideasCount,
     },
+    {
+      id: "queue" as ViewMode,
+      label: "Coda",
+      icon: Send,
+      badge: queueCount,
+    },
   ];
 
   return (
@@ -53,7 +61,7 @@ export function BottomNav({
             <button
               key={tab.id}
               onClick={() => onChangeView(tab.id)}
-              className={`relative flex flex-col items-center justify-center py-1.5 px-3.5 sm:px-5 rounded-3xl transition-all duration-200 select-none ${
+              className={`relative flex flex-col items-center justify-center py-1.5 px-2.5 sm:px-5 rounded-3xl transition-all duration-200 select-none ${
                 isActive
                   ? "bg-pastel-sky/60 text-cosmo-alien font-bold scale-105 shadow-2xs"
                   : "text-plum-500 hover:text-plum-800 font-medium"

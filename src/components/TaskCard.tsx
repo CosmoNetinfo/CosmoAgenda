@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { createPortal } from "react-dom";
 import { Task } from "@/types";
 import { APP_CONFIG } from "@/config/app";
+import { describeRepeat } from "@/lib/repeat";
 import { addDays, getMonday, getLocalDateString, parseLocalDate } from "@/lib/date-utils";
 import {
   Clock,
@@ -23,6 +24,7 @@ import {
   ListTodo,
   CalendarClock,
   Repeat,
+  Link2,
 } from "lucide-react";
 
 interface TaskCardProps {
@@ -52,6 +54,7 @@ export function TaskCard({
     { label: "Tra 2 giorni", date: addDays(task.date, 2) },
     { label: "Lunedì prossimo", date: nextMonday },
     { label: "Tra una settimana", date: addDays(task.date, 7) },
+    { label: "Tra 2 settimane", date: addDays(task.date, 14) },
   ];
   const formatShort = (d: string) =>
     parseLocalDate(d).toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" });
@@ -168,6 +171,32 @@ export function TaskCard({
               title="Priorità alta"
             >
               Alta
+            </span>
+          )}
+
+          {/* Stato nella coda di pubblicazione */}
+          {task.pub_status && (
+            <span
+              className={`inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${
+                task.pub_status === "pubblicato"
+                  ? "bg-[#D4F1E4] text-[#1D4E3A] border-[#B4E4CE]"
+                  : task.pub_status === "pronto"
+                  ? "bg-[#D6ECFF] text-[#1E3E66] border-[#B8DCFC]"
+                  : "bg-[#FFF3C4] text-[#554316] border-[#F3E19C]"
+              }`}
+            >
+              {task.pub_status === "da_preparare" ? "da preparare" : task.pub_status}
+            </span>
+          )}
+          {task.link && (
+            <span className="inline-flex items-center text-[10px] font-semibold text-cosmo-alien" title={task.link}>
+              <Link2 size={11} className="mr-0.5" />
+              link
+            </span>
+          )}
+          {task.repeat_rule && (
+            <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-pastel-lavender/40 text-plum-800 border border-pastel-lavender" title="Si ripete">
+              ↻ {describeRepeat(task.repeat_rule)}
             </span>
           )}
 
