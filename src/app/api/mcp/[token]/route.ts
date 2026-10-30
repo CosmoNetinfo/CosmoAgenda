@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendPushToUser } from "@/lib/push";
+import { timingSafeEqual } from "crypto";
 
 // Server MCP remoto per Claude, Grok e assistenti IA
 // Trasporto HTTP Streamable / JSON-RPC 2.0 conforme alle specifiche MCP 2024-11-05
@@ -121,6 +122,35 @@ const MCP_TOOLS = [
         status: { type: "string", enum: ["todo", "done", "skipped"] },
       },
       required: ["task_id"],
+    },
+  },
+  {
+    name: "postpone_task",
+    description:
+      "Posticipa un'attività a un'altra data (tiene il conto di quante volte è stata rimandata). Usa to_date oppure days.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        task_id: { type: "string", description: "ID UUID dell'attività" },
+        to_date: { type: "string", description: "Nuova data YYYY-MM-DD" },
+        days: { type: "number", description: "Giorni da aggiungere alla data attuale (es. 1 = domani rispetto alla data dell'attività)" },
+      },
+      required: ["task_id"],
+    },
+  },
+  {
+    name: "postpone_day",
+    description:
+      "Posticipa in blocco le attività ancora da fare di un giorno (o di un intervallo). Per sicurezza, chiedere conferma all'utente prima di usarlo.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        from_date: { type: "string", description: "Giorno di partenza YYYY-MM-DD" },
+        to_date: { type: "string", description: "Giorno di arrivo YYYY-MM-DD" },
+        end_date: { type: "string", description: "Facoltativo: ultimo giorno dell'intervallo di partenza" },
+        keep_high_priority: { type: "boolean", description: "Se true lascia dove sono le attività con priorità alta" },
+      },
+      required: ["from_date", "to_date"],
     },
   },
   {
@@ -286,7 +316,7 @@ const MCP_TOOLS = [
         },
         title: {
           type: "string",
-          description: "Titolo opzionale (se omesso viene letto dalla pagina)",
+          description: "Titolo opzionale, usato solo con un singolo link (se omesso si usa il dominio)",
         },
         note: {
           type: "string",
@@ -341,14 +371,13 @@ const MCP_TOOLS = [
   },
 ];
 
-// Verifica del token segreto
+// Verifica del token segreto (nessun valore di riserva: senza variabile d'ambiente il server resta chiuso)
 function verifyToken(token: string): boolean {
   const expectedToken = process.env.MCP_AUTH_TOKEN;
-  if (!expectedToken) {
-    // Se non impostato in .env, accetta fallback controllato
-    return token === "orbita-mcp-secret-2026";
-  }
-  return token === expectedToken;
+  if (!expectedToken || expectedToken.length < 32) return false;
+  const a = Buffer.from(token);
+  const b = Buffer.from(expectedToken);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 // UUID del proprietario dell'agenda (richiesto per gli insert con admin client,
@@ -357,6 +386,12 @@ function getOwnerUserId(): string {
   const uid = process.env.ORBITA_USER_ID;
   if (!uid) throw new Error("ORBITA_USER_ID non configurata: impossibile operare sui dati");
   return uid;
+}
+
+// Verifica che l'attività appartenga al proprietario (il client admin ignora la RLS)
+async function assertTaskOwned(supabase: any, taskId: string, ownerUserId: string) {
+  const { data } = await supabase.from("tasks").select("id").eq("id", taskId).eq("user_id", ownerUserId).maybeSingle();
+  if (!data) throw new Error("Attività non trovata");
 }
 
 // Handler per l'esecuzione degli strumenti
@@ -441,7 +476,19 @@ async function executeTool(name: string, args: any) {
     }
 
     case "update_task": {
-      const { task_id, ...updates } = args;
+      const { task_id, ...rest } = args;
+      const allowed = ["title", "notes", "date", "time", "kind", "project", "priority", "status"];
+      const updates: Record<string, any> = {};
+      for (const k of allowed) if (rest[k] !== undefined) updates[k] = rest[k] === "" ? null : rest[k];
+      if (updates.title === null) delete updates.title;
+      if (updates.date && rest.date && updates.date !== undefined) {
+        // cambio data a mano = posticipo/spostamento: tienilo tracciato
+        const { data: cur } = await supabase.from("tasks").select("date, original_date, postponed_count").eq("id", task_id).eq("user_id", ownerUserId).single();
+        if (cur && updates.date > cur.date) {
+          updates.original_date = cur.original_date || cur.date;
+          updates.postponed_count = (cur.postponed_count || 0) + 1;
+        }
+      }
       const { data, error } = await supabase
         .from("tasks")
         .update(updates)
@@ -452,6 +499,52 @@ async function executeTool(name: string, args: any) {
 
       if (error) throw error;
       return { success: true, task: data };
+    }
+
+    case "postpone_task": {
+      const { task_id, to_date, days } = args;
+      const { data: cur, error: e1 } = await supabase
+        .from("tasks").select("date, original_date, postponed_count, status")
+        .eq("id", task_id).eq("user_id", ownerUserId).single();
+      if (e1) throw e1;
+      let target = to_date as string | undefined;
+      if (!target && typeof days === "number") {
+        const d = new Date(`${cur.date}T12:00:00Z`);
+        d.setUTCDate(d.getUTCDate() + days);
+        target = d.toISOString().slice(0, 10);
+      }
+      if (!target || !/^\d{4}-\d{2}-\d{2}$/.test(target)) throw new Error("Indicare to_date (YYYY-MM-DD) oppure days");
+      const { data, error } = await supabase
+        .from("tasks")
+        .update({
+          date: target,
+          original_date: cur.original_date || cur.date,
+          postponed_count: (cur.postponed_count || 0) + 1,
+        })
+        .eq("id", task_id).eq("user_id", ownerUserId)
+        .select().single();
+      if (error) throw error;
+      return { success: true, message: `"${data.title}" posticipata al ${target} (rimandata ${data.postponed_count} volte)`, task: data };
+    }
+
+    case "postpone_day": {
+      const { from_date, to_date, end_date, keep_high_priority } = args;
+      let q = supabase.from("tasks").select("id, title, date, priority, original_date, postponed_count")
+        .eq("user_id", ownerUserId).eq("status", "todo").gte("date", from_date).lte("date", end_date || from_date);
+      if (keep_high_priority) q = q.neq("priority", "alta");
+      const { data: list, error: e1 } = await q;
+      if (e1) throw e1;
+      const moved: any[] = [];
+      for (const t of list || []) {
+        if (t.date === to_date) continue;
+        const { error } = await supabase.from("tasks").update({
+          date: to_date,
+          original_date: t.original_date || t.date,
+          postponed_count: (t.postponed_count || 0) + 1,
+        }).eq("id", t.id).eq("user_id", ownerUserId);
+        if (!error) moved.push({ id: t.id, title: t.title });
+      }
+      return { success: true, moved_count: moved.length, to_date, moved };
     }
 
     case "complete_task": {
@@ -515,6 +608,7 @@ async function executeTool(name: string, args: any) {
 
       if (!taskId) throw new Error("Parametro 'task_id' (o 'attivita') obbligatorio");
       if (!name.endsWith(".md")) name = `${name}.md`;
+      await assertTaskOwned(supabase, taskId, ownerUserId);
 
       const byteLength = new TextEncoder().encode(content).length;
       if (byteLength > 204800) {
@@ -534,18 +628,6 @@ async function executeTool(name: string, args: any) {
 
       if (error) throw error;
 
-      // Invia notifica push nativa immediata (stile messaggio WhatsApp)
-      try {
-        const timeStr = data.time ? ` alle ${data.time.substring(0, 5)}` : "";
-        sendPushToUser(ownerUserId, {
-          title: "👾 C'è da fare una cosa!",
-          body: `"${data.title}" per il ${data.date}${timeStr}`,
-          url: "/",
-        }).catch((e) => console.error("Errore notifica push MCP:", e));
-      } catch (pushErr) {
-        // Non bloccare la risposta MCP se l'invio push fallisce
-      }
-
       return {
         success: true,
         message: `File Markdown "${data.name}" allegato con successo all'attività`,
@@ -555,7 +637,10 @@ async function executeTool(name: string, args: any) {
 
     case "list_files": {
       const taskId = args.task_id || args.attivita;
-      let query = supabase.from("task_files").select("id, task_id, name, created_by, created_at, updated_at");
+      let query = supabase
+        .from("task_files")
+        .select("id, task_id, name, created_by, created_at, updated_at, tasks!inner(user_id)")
+        .eq("tasks.user_id", ownerUserId);
       if (taskId) {
         query = query.eq("task_id", taskId);
       }
@@ -570,8 +655,9 @@ async function executeTool(name: string, args: any) {
       if (!fileId) throw new Error("Parametro 'file_id' obbligatorio");
       const { data, error } = await supabase
         .from("task_files")
-        .select("*")
+        .select("*, tasks!inner(user_id)")
         .eq("id", fileId)
+        .eq("tasks.user_id", ownerUserId)
         .single();
       if (error) throw error;
       return { success: true, file: data };
@@ -597,6 +683,14 @@ async function executeTool(name: string, args: any) {
         updates.name = name;
       }
 
+      const { data: owned } = await supabase
+        .from("task_files")
+        .select("id, tasks!inner(user_id)")
+        .eq("id", fileId)
+        .eq("tasks.user_id", ownerUserId)
+        .maybeSingle();
+      if (!owned) throw new Error("File non trovato");
+
       const { data, error } = await supabase
         .from("task_files")
         .update(updates)
@@ -605,18 +699,6 @@ async function executeTool(name: string, args: any) {
         .single();
 
       if (error) throw error;
-
-      // Invia notifica push nativa immediata (stile messaggio WhatsApp)
-      try {
-        const timeStr = data.time ? ` alle ${data.time.substring(0, 5)}` : "";
-        sendPushToUser(ownerUserId, {
-          title: "👾 C'è da fare una cosa!",
-          body: `"${data.title}" per il ${data.date}${timeStr}`,
-          url: "/",
-        }).catch((e) => console.error("Errore notifica push MCP:", e));
-      } catch (pushErr) {
-        // Non bloccare la risposta MCP se l'invio push fallisce
-      }
 
       return {
         success: true,
@@ -643,6 +725,7 @@ async function executeTool(name: string, args: any) {
       const note = args.note || null;
       const createdItems: any[] = [];
       const skippedDuplicates: string[] = [];
+      const failed: string[] = [];
 
       for (const u of urls) {
         let validUrl = u.trim();
@@ -668,7 +751,7 @@ async function executeTool(name: string, args: any) {
           domain = validUrl;
         }
 
-        const title = args.title || domain;
+        const title = (urls.length === 1 && args.title) || domain;
 
         const { data, error } = await supabase
           .from("ideas")
@@ -684,7 +767,9 @@ async function executeTool(name: string, args: any) {
           .select()
           .single();
 
-        if (!error && data) {
+        if (error) {
+          failed.push(`${validUrl}: ${error.message}`);
+        } else if (data) {
           createdItems.push(data);
         }
       }
@@ -694,6 +779,7 @@ async function executeTool(name: string, args: any) {
         added_count: createdItems.length,
         ideas: createdItems,
         duplicates_skipped: skippedDuplicates,
+        failed,
       };
     }
 
@@ -767,6 +853,11 @@ export async function POST(
     // Gestione standard JSON-RPC 2.0 (Claude MCP)
     if (body.jsonrpc === "2.0") {
       const { id, method, params: rpcParams } = body;
+
+      // Notifiche (es. notifications/initialized): nessuna risposta JSON-RPC
+      if (id === undefined || id === null) {
+        return new NextResponse(null, { status: 202, headers: CORS_HEADERS });
+      }
 
       // Inizializzazione protocollo MCP
       if (method === "initialize") {

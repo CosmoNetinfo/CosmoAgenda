@@ -27,6 +27,8 @@ export interface Task {
   project?: string | null;
   priority: TaskPriorityId;
   repeat_rule?: string | null;
+  postponed_count?: number; // quante volte è stata posticipata
+  original_date?: string | null; // data di partenza prima del primo posticipo
   subtasks: Subtask[];
   task_files?: TaskFile[];
   status: TaskStatusId;

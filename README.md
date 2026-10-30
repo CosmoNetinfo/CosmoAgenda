@@ -14,7 +14,7 @@
   - **Mese**: Calendario completo con puntini colorati in base al tipo di attività.
 - **Tipi di Attività Colorati**: Articolo, vignetta, lo-sapevi-che, consiglio-rapido, flash-news, call, app, sito, social, altro.
 - **Sotto-attività**: Mini checklist integrata dentro ogni attività.
-- **Connettore MCP per Claude & Grok**: Server MCP Streamable HTTP (`/api/mcp/<token>`) con strumenti: `add_task`, `list_tasks`, `get_day`, `update_task`, `complete_task`, `skip_task`, `add_note` (nessun comando di cancellazione per sicurezza).
+- **Connettore MCP per Claude & Grok**: Server MCP Streamable HTTP (`/api/mcp/<token>`) con strumenti: `add_task`, `list_tasks`, `get_day`, `update_task`, `complete_task`, `skip_task`, `add_note`, `postpone_task`, `postpone_day`, file `.md` (`add_file`, `list_files`, `get_file`, `update_file`) e idee (`add_idea`, `list_ideas`, `update_idea`). Nessun comando di cancellazione per sicurezza.
 - **API REST & OpenAPI**: Endpoint `/api/openapi.json` pronto per Azioni GPT personalizzate e Comandi Rapidi di Siri.
 - **Dettatura Vocale IA (Fase 5)**: Trascrizione con Groq Whisper (`whisper-large-v3-turbo`) ed estrazione strutturata dei campi con Llama 3.3; salvataggio solo dopo anteprima e conferma dell'utente.
 - **PWA (Installabile su Telefono)**: Web App Manifest, icona a tutto schermo e cache locale per consultare le attività anche con rete debole.
@@ -60,7 +60,7 @@ SUPABASE_SERVICE_ROLE_KEY=la_tua_service_role_key_segreta
 # Genera un token sicuro (almeno 32 caratteri casuali):
 #   openssl rand -base64 32       ← su macOS/Linux/WSL
 #   [System.Convert]::ToBase64String((1..32 | %{ [byte](Get-Random -Max 256) }))  ← PowerShell
-MCP_AUTH_TOKEN=un-token-lungo-e-casuale-di-almeno-32-caratteri
+MCP_AUTH_TOKEN=un-token-lungo-e-casuale-di-almeno-32-caratteri  # obbligatorio: senza, il connettore resta chiuso
 
 # UUID del tuo utente Supabase: Dashboard > Authentication > Users > copia l'ID
 ORBITA_USER_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
@@ -71,7 +71,7 @@ GROQ_API_KEY=la_tua_chiave_groq_opzionale
 ### 4. Applica la migrazione SQL su Supabase
 Nella dashboard del tuo progetto Supabase:
 1. Vai su **SQL Editor**.
-2. Copia e incolla l'intero contenuto del file `supabase/migrations/20261022000000_create_tasks.sql`.
+2. Copia e incolla l'intero contenuto di `supabase/full_schema.sql` (oppure, se hai già il database, esegui in ordine i file in `supabase/migrations/`, ultimo: `20261030000000_add_postpone.sql`).
 3. Clicca su **Run**.
 
 Questo creerà la tabella `tasks`, gli indici per data e stato, i trigger di aggiornamento e le policy di sicurezza RLS.
@@ -106,6 +106,10 @@ Orbita Agent include un server MCP HTTP Streamable nativo.
 - `complete_task`: Segna un'attività come completata.
 - `skip_task`: Segna un'attività come saltata.
 - `add_note`: Accoda un appunto all'attività.
+- `postpone_task`: Posticipa un'attività (a una data o di N giorni) tenendo il conto delle volte rimandata.
+- `postpone_day`: Posticipa in blocco le attività da fare di un giorno (chiedere conferma prima).
+- `add_file` / `list_files` / `get_file` / `update_file`: file Markdown allegati alle attività (max 200 KB).
+- `add_idea` / `list_ideas` / `update_idea`: sezione Idee e link.
 
 ---
 

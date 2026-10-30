@@ -16,6 +16,7 @@ interface DayViewProps {
   onToggleStatus: (task: Task) => void;
   onClickTask: (task: Task) => void;
   onMoveToToday: (task: Task) => void;
+  onPostpone: (items: Task | Task[], toDate: string) => void;
   onOpenNewTask: () => void;
 }
 
@@ -27,6 +28,7 @@ export function DayView({
   onToggleStatus,
   onClickTask,
   onMoveToToday,
+  onPostpone,
   onOpenNewTask,
 }: DayViewProps) {
   const [hasCelebrated, setHasCelebrated] = useState(false);
@@ -146,7 +148,7 @@ export function DayView({
 
             <button
               type="button"
-              onClick={() => overdueTasks.forEach((t) => onMoveToToday(t))}
+              onClick={() => onPostpone(overdueTasks, getTodayString())}
               className="text-xs font-bold px-3 py-1.5 rounded-2xl bg-white text-[#D84315] hover:bg-[#FFEAE2] border border-[#FFC4B2] shadow-2xs transition-all active:scale-95"
             >
               Sposta tutte a oggi
@@ -161,10 +163,30 @@ export function DayView({
                 onToggleStatus={onToggleStatus}
                 onClick={onClickTask}
                 onMoveToToday={onMoveToToday}
+                onPostpone={onPostpone}
                 isOverdue={true}
               />
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Giornata troppo piena: sposta tutto quello che resta a domani (le priorità alte restano) */}
+      {tasks.some((t) => t.status === "todo") && currentDate >= getTodayString() && (
+        <div className="flex justify-end mb-2">
+          <button
+            type="button"
+            onClick={() => {
+              const movable = tasks.filter((t) => t.status === "todo" && t.priority !== "alta");
+              if (movable.length === 0) return;
+              if (confirm(`Posticipare ${movable.length} attività a domani? (quelle con priorità alta restano)`)) {
+                onPostpone(movable, addDays(currentDate, 1));
+              }
+            }}
+            className="text-xs font-bold px-3 py-1.5 rounded-2xl bg-white text-plum-700 hover:bg-cream-100 border border-cream-300 shadow-2xs transition-all active:scale-95"
+          >
+            Troppo pieno? Posticipa a domani
+          </button>
         </div>
       )}
 
@@ -177,6 +199,7 @@ export function DayView({
               task={task}
               onToggleStatus={onToggleStatus}
               onClick={onClickTask}
+              onPostpone={onPostpone}
             />
           ))}
         </div>
