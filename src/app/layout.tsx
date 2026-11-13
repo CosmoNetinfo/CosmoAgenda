@@ -43,7 +43,6 @@ export default function RootLayout({
     <html lang="it" className={nunito.variable}>
       <head>
         <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-        <link rel="apple-touch-icon" href="/icon.svg" />
       </head>
       <body className="min-h-screen bg-cream-100 font-sans antialiased text-plum-800">
         {children}
