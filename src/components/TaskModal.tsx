@@ -49,6 +49,7 @@ export function TaskModal({
 }: TaskModalProps) {
   const supabase = createClient();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const titleRef = useRef<HTMLTextAreaElement | null>(null);
 
   const [title, setTitle] = useState("");
   const [date, setDate] = useState(defaultDate);
@@ -62,6 +63,14 @@ export function TaskModal({
   const [status, setStatus] = useState<TaskStatusId>("todo");
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Il titolo va a capo e il campo si allarga, così il testo lungo non resta nascosto
+  useEffect(() => {
+    const el = titleRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [title, isOpen]);
 
   // File Markdown (.md)
   const [files, setFiles] = useState<TaskFile[]>([]);
@@ -387,13 +396,17 @@ export function TaskModal({
             <label className="block text-xs font-bold text-plum-700 mb-1.5 uppercase tracking-wider">
               Cosa c&apos;è da fare? *
             </label>
-            <input
-              type="text"
+            <textarea
+              ref={titleRef}
+              rows={1}
               required
               placeholder="Es. Scrivere bozza articolo, Call con Daniele..."
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full text-base font-semibold text-plum-900 bg-white rounded-2xl px-4 py-3 border border-cream-300 focus:outline-none focus:ring-2 focus:ring-cosmo-alien/30 focus:border-cosmo-alien shadow-card"
+              onChange={(e) => setTitle(e.target.value.replace(/\n/g, " "))}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.preventDefault();
+              }}
+              className="w-full resize-none overflow-hidden break-words text-base font-semibold text-plum-900 bg-white rounded-2xl px-4 py-3 border border-cream-300 focus:outline-none focus:ring-2 focus:ring-cosmo-alien/30 focus:border-cosmo-alien shadow-card"
             />
           </div>
 
