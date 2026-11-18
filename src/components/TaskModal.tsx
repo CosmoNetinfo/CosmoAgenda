@@ -398,7 +398,7 @@ export function TaskModal({
             </label>
             <textarea
               ref={titleRef}
-              rows={1}
+              rows={2}
               required
               placeholder="Es. Scrivere bozza articolo, Call con Daniele..."
               value={title}
